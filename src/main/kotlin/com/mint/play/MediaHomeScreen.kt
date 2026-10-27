@@ -31,7 +31,8 @@ import kotlinx.coroutines.withContext
 fun MediaHomeScreen(
     isVideo: Boolean,
     permissionGranted: Boolean,
-    onRequestPermissions: () -> Unit
+    onRequestPermissions: () -> Unit,
+    onVideoPlayerVisibilityChanged: (Boolean) -> Unit = {}
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -56,6 +57,10 @@ fun MediaHomeScreen(
 
     var selectedVideo by remember(isVideo) {
         mutableStateOf<MediaItem?>(null)
+    }
+
+    LaunchedEffect(selectedVideo, isVideo) {
+        onVideoPlayerVisibilityChanged(isVideo && selectedVideo != null)
     }
 
     var favouriteUris by remember {
@@ -149,8 +154,7 @@ fun MediaHomeScreen(
     videoTitles = playerVideos.map { it.name },
     initialIndex = playerIndex,
     onBack = {
-        // Keep the same back-navigation action
-        // that your existing call was using.
+        selectedVideo = null
     }
 )
     } else {
