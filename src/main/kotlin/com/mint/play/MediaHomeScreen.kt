@@ -56,14 +56,20 @@ fun MediaHomeScreen(
         mutableStateOf(MediaHistoryStore.getRecentVideoUris(context))
     }
 
-    DisposableEffect(historyPreferences) {
+    DisposableEffect(historyPreferences, selectedVideo) {
+        showHistory = MediaHistoryStore.isHistoryEnabled(context)
+        historyUris = MediaHistoryStore.getRecentVideoUris(context)
+
         val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
             when (key) {
                 MediaHistoryStore.SHOW_HISTORY_KEY -> {
                     showHistory = MediaHistoryStore.isHistoryEnabled(context)
                 }
                 MediaHistoryStore.VIDEO_HISTORY_KEY -> {
-                    historyUris = MediaHistoryStore.getRecentVideoUris(context)
+                    // Don't recompose the player playlist while a video is playing.
+                    if (selectedVideo == null) {
+                        historyUris = MediaHistoryStore.getRecentVideoUris(context)
+                    }
                 }
             }
         }
