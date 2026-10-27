@@ -35,7 +35,9 @@ fun MediaItemRow(
     onDelete: () -> Unit = {},
     onRename: (String) -> Unit = {},
     onShowDetails: () -> Unit = {},
-    onPlayVideo: () -> Unit = {}
+    onPlayVideo: () -> Unit = {},
+    isFavourite: Boolean = false,
+    onRemoveFromPlaylist: (() -> Unit)? = null
 ) {
     var showRename by remember(item.uri) { mutableStateOf(false) }
     var showDelete by remember(item.uri) { mutableStateOf(false) }
@@ -104,7 +106,9 @@ fun MediaItemRow(
                     onDelete = { showDelete = true },
                     onFavourite = onFavourite,
                     onAddToPlaylist = onAddToPlaylist,
-                    onShowDetails = { showDetails = true }
+                    onShowDetails = { showDetails = true },
+                    isFavourite = isFavourite,
+                    onRemoveFromPlaylist = onRemoveFromPlaylist
                 )
             }
 

@@ -56,6 +56,12 @@ class MediaItemActionHandler(context: Context) {
         handleResult(actions.addToPlaylist(playlistName, uri))
     }
 
+    fun removeFromPlaylist(playlistName: String, uri: Uri) {
+        actions.removeFromPlaylist(playlistName, uri)
+        onMessage("Removed from playlist.")
+        onLibraryChanged()
+    }
+
     fun createPlaylist(name: String) {
         handleResult(actions.createPlaylist(name))
     }

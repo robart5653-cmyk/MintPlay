@@ -37,7 +37,9 @@ fun MediaItemMenu(
     onDelete: () -> Unit,
     onFavourite: () -> Unit,
     onAddToPlaylist: () -> Unit,
-    onShowDetails: () -> Unit
+    onShowDetails: () -> Unit,
+    isFavourite: Boolean = false,
+    onRemoveFromPlaylist: (() -> Unit)? = null
 ) {
     var expanded by remember { mutableStateOf(false) }
 
@@ -103,9 +105,9 @@ fun MediaItemMenu(
             )
 
             MenuAction(
-                icon = "♡",
-                title = "Add to favourites",
-                subtitle = "Keep it close",
+                icon = if (isFavourite) "★" else "♡",
+                title = if (isFavourite) "Remove from favourites" else "Add to favourites",
+                subtitle = if (isFavourite) "Take it out of favourites" else "Keep it close",
                 onClick = {
                     expanded = false
                     onFavourite()
@@ -121,6 +123,18 @@ fun MediaItemMenu(
                     onAddToPlaylist()
                 }
             )
+
+            if (onRemoveFromPlaylist != null) {
+                MenuAction(
+                    icon = "−",
+                    title = "Remove from playlist",
+                    subtitle = "Keep the file in your library",
+                    onClick = {
+                        expanded = false
+                        onRemoveFromPlaylist()
+                    }
+                )
+            }
 
             MenuAction(
                 icon = "ⓘ",

@@ -16,9 +16,14 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -51,6 +56,8 @@ fun MediaLibraryDropdown(
     onSelectFavourites: () -> Unit = {},
     onSelectPlaylist: (String) -> Unit = {},
     onCreatePlaylist: () -> Unit = {},
+    onRenamePlaylist: (String, String) -> Unit = { _, _ -> },
+    onDeletePlaylist: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -211,6 +218,12 @@ fun MediaLibraryDropdown(
                                         onSelectPlaylist(playlist)
                                         searchText = ""
                                         expanded = false
+                                    },
+                                    onRenamePlaylist = { newName ->
+                                        onRenamePlaylist(playlist, newName)
+                                    },
+                                    onDeletePlaylist = {
+                                        onDeletePlaylist(playlist)
                                     }
                                 )
                             }
@@ -227,68 +240,171 @@ private fun CollectionOption(
     title: String,
     selected: Boolean,
     icon: String,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onRenamePlaylist: ((String) -> Unit)? = null,
+    onDeletePlaylist: (() -> Unit)? = null
 ) {
+    var manageExpanded by remember(title) { mutableStateOf(false) }
+    var showRenameDialog by remember(title) { mutableStateOf(false) }
+    var showDeleteDialog by remember(title) { mutableStateOf(false) }
+    var editedName by remember(title) { mutableStateOf(title) }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
             .background(
                 if (selected) Accent.copy(alpha = 0.10f)
                 else Color.Transparent
             )
-            .padding(horizontal = 14.dp, vertical = 12.dp),
+            .padding(horizontal = 14.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        when (icon) {
-            "all" -> Text(
-                text = "≡",
-                color = if (selected) Accent else SecondaryText,
-                fontSize = 22.sp,
-                modifier = Modifier.width(28.dp)
-            )
+        Row(
+            modifier = Modifier
+                .weight(1f)
+                .clickable(onClick = onClick)
+                .padding(vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            when (icon) {
+                "all" -> Text(
+                    text = "≡",
+                    color = if (selected) Accent else SecondaryText,
+                    fontSize = 22.sp,
+                    modifier = Modifier.width(28.dp)
+                )
 
-            "favourite" -> Text(
-                text = "★",
-                color = if (selected) Accent else SecondaryText,
-                fontSize = 18.sp,
-                modifier = Modifier.width(28.dp)
-            )
+                "favourite" -> Text(
+                    text = "★",
+                    color = if (selected) Accent else SecondaryText,
+                    fontSize = 18.sp,
+                    modifier = Modifier.width(28.dp)
+                )
 
-            "create" -> Text(
-                text = "+",
-                color = Accent,
-                fontSize = 24.sp,
-                modifier = Modifier.width(28.dp)
-            )
+                "create" -> Text(
+                    text = "+",
+                    color = Accent,
+                    fontSize = 24.sp,
+                    modifier = Modifier.width(28.dp)
+                )
 
-            else -> Text(
-                text = "♫",
-                color = if (selected) Accent else SecondaryText,
-                fontSize = 18.sp,
-                modifier = Modifier.width(28.dp)
-            )
-        }
+                else -> Text(
+                    text = "♫",
+                    color = if (selected) Accent else SecondaryText,
+                    fontSize = 18.sp,
+                    modifier = Modifier.width(28.dp)
+                )
+            }
 
-        Text(
-            text = title,
-            color = if (selected) Accent else PrimaryText,
-            fontSize = 14.sp,
-            fontWeight = if (selected) {
-                FontWeight.SemiBold
-            } else {
-                FontWeight.Normal
-            },
-            modifier = Modifier.weight(1f)
-        )
-
-        if (selected) {
             Text(
-                text = "✓",
-                color = Accent,
-                fontSize = 16.sp
+                text = title,
+                color = if (selected) Accent else PrimaryText,
+                fontSize = 14.sp,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                modifier = Modifier.weight(1f)
             )
+
+            if (selected) {
+                Text(
+                    text = "✓",
+                    color = Accent,
+                    fontSize = 16.sp
+                )
+            }
         }
+
+        if (onRenamePlaylist != null && onDeletePlaylist != null) {
+            Box {
+                Text(
+                    text = "⋮",
+                    color = SecondaryText,
+                    fontSize = 22.sp,
+                    modifier = Modifier
+                        .clickable { manageExpanded = true }
+                        .padding(start = 10.dp, end = 2.dp)
+                )
+                DropdownMenu(
+                    expanded = manageExpanded,
+                    onDismissRequest = { manageExpanded = false },
+                    modifier = Modifier.background(NavBackground)
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Rename playlist", color = PrimaryText) },
+                        onClick = {
+                            manageExpanded = false
+                            editedName = title
+                            showRenameDialog = true
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Delete playlist", color = Color(0xFFFF7777)) },
+                        onClick = {
+                            manageExpanded = false
+                            showDeleteDialog = true
+                        }
+                    )
+                }
+            }
+        }
+    }
+
+    if (showRenameDialog && onRenamePlaylist != null) {
+        AlertDialog(
+            onDismissRequest = { showRenameDialog = false },
+            containerColor = NavBackground,
+            title = { Text("Rename playlist", color = PrimaryText) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Choose a new name for this playlist.", color = SecondaryText, fontSize = 13.sp)
+                    OutlinedTextField(
+                        value = editedName,
+                        onValueChange = { editedName = it },
+                        label = { Text("Playlist name") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val cleaned = editedName.trim()
+                    if (cleaned.isNotBlank() && cleaned != title) {
+                        onRenamePlaylist(cleaned)
+                    }
+                    showRenameDialog = false
+                }) { Text("Save", color = Accent) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRenameDialog = false }) {
+                    Text("Cancel", color = SecondaryText)
+                }
+            }
+        )
+    }
+
+    if (showDeleteDialog && onDeletePlaylist != null) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            containerColor = NavBackground,
+            title = { Text("Delete playlist?", color = PrimaryText) },
+            text = {
+                Text(
+                    "Delete \"$title\"? Your media files will not be deleted.",
+                    color = SecondaryText
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    onDeletePlaylist()
+                    showDeleteDialog = false
+                }) { Text("Delete", color = Color(0xFFFF7777)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false }) {
+                    Text("Cancel", color = SecondaryText)
+                }
+            }
+        )
     }
 }
 

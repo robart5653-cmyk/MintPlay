@@ -1,6 +1,7 @@
 package com.mint.play
 
 import android.content.SharedPreferences
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.aspectRatio
@@ -8,9 +9,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -28,7 +32,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -75,6 +81,10 @@ fun MediaHomeScreen(
 
     var selectedCollectionName by remember(isVideo) {
         mutableStateOf("All")
+    }
+
+    var mediaSearchText by remember(isVideo) {
+        mutableStateOf("")
     }
 
     var selectedVideo by remember(isVideo) {
@@ -190,6 +200,10 @@ fun MediaHomeScreen(
         }
     }
 
+    val filteredVisibleItems = visibleItems.filter { item ->
+        item.name.contains(mediaSearchText.trim(), ignoreCase = true)
+    }
+
     val historyVideos = if (isVideo) {
         val itemsByUri = mediaItems.associateBy { it.uri.toString() }
         historyUris.mapNotNull { uri -> itemsByUri[uri] }
@@ -200,7 +214,7 @@ fun MediaHomeScreen(
     if (isVideo && selectedVideo != null) {
         val video = selectedVideo!!
 
-        val playlistVideos = visibleItems.filter { item ->
+        val playlistVideos = filteredVisibleItems.filter { item ->
             item.uri.toString().isNotBlank()
         }
 
@@ -291,7 +305,8 @@ fun MediaHomeScreen(
                             },
                             onDelete = {
                                 actionHandler.delete(item.uri)
-                            }
+                            },
+                            isFavourite = item.uri.toString() in favouriteUris
                         )
                     }
                 }
@@ -348,19 +363,103 @@ fun MediaHomeScreen(
                 onSelectAll = {
                     selectedCollection = MediaCollection.All
                     selectedCollectionName = "All"
+                    mediaSearchText = ""
                 },
                 onSelectFavourites = {
                     selectedCollection = MediaCollection.Favourites
                     selectedCollectionName = "Favourites"
+                    mediaSearchText = ""
                 },
                 onSelectPlaylist = { name ->
                     selectedCollection = MediaCollection.Playlist
                     selectedCollectionName = name
+                    mediaSearchText = ""
                 },
                 onCreatePlaylist = {
                     dialogState.requestCreatePlaylist()
+                },
+                onRenamePlaylist = { oldName, newName ->
+                    when (val result = actions.renamePlaylist(oldName, newName)) {
+                        MediaActionResult.Success -> {
+                            playlists = actions.getPlaylistNames()
+                            if (selectedCollection == MediaCollection.Playlist &&
+                                selectedCollectionName == oldName
+                            ) {
+                                selectedCollectionName = newName
+                            }
+                            actionMessage = "Playlist renamed."
+                            reloadLibrary()
+                        }
+                        is MediaActionResult.Failure -> actionMessage = result.message
+                        is MediaActionResult.NeedsUserApproval -> {
+                            actionMessage = "Android approval is not needed to rename a playlist."
+                        }
+                    }
+                },
+                onDeletePlaylist = { name ->
+                    when (val result = actions.deletePlaylist(name)) {
+                        MediaActionResult.Success -> {
+                            playlists = actions.getPlaylistNames()
+                            if (selectedCollection == MediaCollection.Playlist &&
+                                selectedCollectionName == name
+                            ) {
+                                selectedCollection = MediaCollection.All
+                                selectedCollectionName = "All"
+                            }
+                            actionMessage = "Playlist deleted."
+                            reloadLibrary()
+                        }
+                        is MediaActionResult.Failure -> actionMessage = result.message
+                        is MediaActionResult.NeedsUserApproval -> {
+                            actionMessage = "Android approval is not needed to delete a playlist."
+                        }
+                    }
                 }
             )
+
+            if (permissionGranted) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 2.dp, bottom = 8.dp)
+                        .background(NavBackground, RoundedCornerShape(10.dp))
+                        .padding(horizontal = 12.dp, vertical = 11.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("⌕", color = SecondaryText, fontSize = 22.sp)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    BasicTextField(
+                        value = mediaSearchText,
+                        onValueChange = { mediaSearchText = it },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true,
+                        textStyle = TextStyle(color = PrimaryText, fontSize = 14.sp),
+                        cursorBrush = SolidColor(Accent),
+                        decorationBox = { innerTextField ->
+                            Box {
+                                if (mediaSearchText.isEmpty()) {
+                                    Text(
+                                        text = "Search ${if (isVideo) "videos" else "audio"} in $selectedCollectionName",
+                                        color = SecondaryText,
+                                        fontSize = 14.sp
+                                    )
+                                }
+                                innerTextField()
+                            }
+                        }
+                    )
+                    if (mediaSearchText.isNotEmpty()) {
+                        Text(
+                            text = "×",
+                            color = SecondaryText,
+                            fontSize = 20.sp,
+                            modifier = Modifier
+                                .clickable { mediaSearchText = "" }
+                                .padding(start = 8.dp)
+                        )
+                    }
+                }
+            }
 
             actionMessage?.let { message ->
                 Text(
@@ -406,7 +505,7 @@ fun MediaHomeScreen(
                     }
                 }
 
-                visibleItems.isEmpty() -> {
+                filteredVisibleItems.isEmpty() -> {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -414,17 +513,15 @@ fun MediaHomeScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = when (selectedCollection) {
-                                MediaCollection.All ->
-                                    "No ${
-                                        if (isVideo) "videos" else "audio files"
-                                    } found."
-
-                                MediaCollection.Favourites ->
-                                    "No favourites yet."
-
-                                MediaCollection.Playlist ->
-                                    "This playlist has no available media."
+                            text = if (mediaSearchText.isNotBlank() && visibleItems.isNotEmpty()) {
+                                "No matching media found."
+                            } else {
+                                when (selectedCollection) {
+                                    MediaCollection.All ->
+                                        "No ${if (isVideo) "videos" else "audio files"} found."
+                                    MediaCollection.Favourites -> "No favourites yet."
+                                    MediaCollection.Playlist -> "This playlist has no available media."
+                                }
                             },
                             color = SecondaryText
                         )
@@ -438,7 +535,7 @@ fun MediaHomeScreen(
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         items(
-                            items = visibleItems,
+                            items = filteredVisibleItems,
                             key = { it.uri.toString() }
                         ) { item ->
                             MediaItemRow(
@@ -461,6 +558,14 @@ fun MediaHomeScreen(
                                 },
                                 onDelete = {
                                     actionHandler.delete(item.uri)
+                                },
+                                isFavourite = item.uri.toString() in favouriteUris,
+                                onRemoveFromPlaylist = if (selectedCollection == MediaCollection.Playlist) {
+                                    {
+                                        actionHandler.removeFromPlaylist(selectedCollectionName, item.uri)
+                                    }
+                                } else {
+                                    null
                                 }
                             )
                         }
