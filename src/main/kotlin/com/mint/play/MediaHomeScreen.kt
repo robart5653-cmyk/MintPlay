@@ -1,18 +1,24 @@
 package com.mint.play
 
+import android.content.SharedPreferences
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -22,7 +28,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -35,6 +43,36 @@ fun MediaHomeScreen(
     onVideoPlayerVisibilityChanged: (Boolean) -> Unit = {}
 ) {
     val context = LocalContext.current
+    val historyPreferences = remember(context) {
+        context.getSharedPreferences(
+            MediaHistoryStore.PREFS_NAME,
+            android.content.Context.MODE_PRIVATE
+        )
+    }
+    var showHistory by remember(context) {
+        mutableStateOf(MediaHistoryStore.isHistoryEnabled(context))
+    }
+    var historyUris by remember(context) {
+        mutableStateOf(MediaHistoryStore.getRecentVideoUris(context))
+    }
+
+    DisposableEffect(historyPreferences) {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            when (key) {
+                MediaHistoryStore.SHOW_HISTORY_KEY -> {
+                    showHistory = MediaHistoryStore.isHistoryEnabled(context)
+                }
+                MediaHistoryStore.VIDEO_HISTORY_KEY -> {
+                    historyUris = MediaHistoryStore.getRecentVideoUris(context)
+                }
+            }
+        }
+        historyPreferences.registerOnSharedPreferenceChangeListener(listener)
+        onDispose {
+            historyPreferences.unregisterOnSharedPreferenceChangeListener(listener)
+        }
+    }
+
     val scope = rememberCoroutineScope()
     val actions = remember(context) { MediaItemActions(context) }
     val dialogState = remember { MediaActionDialogState() }
@@ -130,6 +168,13 @@ fun MediaHomeScreen(
         }
     }
 
+    val historyVideos = if (isVideo) {
+        val itemsByUri = mediaItems.associateBy { it.uri.toString() }
+        historyUris.mapNotNull { uri -> itemsByUri[uri] }
+    } else {
+        emptyList()
+    }
+
     if (isVideo && selectedVideo != null) {
         val video = selectedVideo!!
 
@@ -163,6 +208,40 @@ fun MediaHomeScreen(
                 .fillMaxSize()
                 .padding(horizontal = 16.dp)
         ) {
+            if (isVideo && showHistory && historyVideos.isNotEmpty()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp, bottom = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "History",
+                        color = Accent,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        contentPadding = PaddingValues(horizontal = 2.dp)
+                    ) {
+                        items(
+                            items = historyVideos,
+                            key = { it.uri.toString() }
+                        ) { item ->
+                            VideoThumbnail(
+                                item = item,
+                                modifier = Modifier
+                                    .width(128.dp)
+                                    .aspectRatio(16f / 9f)
+                                    .clickable { selectedVideo = item }
+                            )
+                        }
+                    }
+                }
+            }
+
             MediaLibraryDropdown(
                 selectedName = selectedCollectionName,
                 playlists = playlists,

@@ -12,6 +12,8 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -40,6 +42,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -211,6 +214,7 @@ fun VideoPlayerScreen(
         saveCurrentPlaybackPosition()
 
         if (activeUri != null) {
+            MediaHistoryStore.addVideo(context, activeUri)
             controller.play(activeUri)
 
             if (resumePlaybackEnabled) {
@@ -289,13 +293,36 @@ fun VideoPlayerScreen(
             }
         )
     } else {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(PlayerBackground)
-    ) {
-        // Original top bar
-        Row(
+        var portraitControlsVisible by remember { mutableStateOf(true) }
+        var portraitTouchActive by remember { mutableStateOf(false) }
+
+        LaunchedEffect(portraitTouchActive) {
+            if (!portraitTouchActive) {
+                delay(5_000)
+                portraitControlsVisible = false
+            }
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(PlayerBackground)
+                .pointerInput(Unit) {
+                    awaitEachGesture {
+                        awaitFirstDown(pass = PointerEventPass.Initial)
+                        portraitTouchActive = true
+                        portraitControlsVisible = true
+                        do {
+                            val event = awaitPointerEvent(PointerEventPass.Initial)
+                        } while (event.changes.any { it.pressed })
+                        portraitTouchActive = false
+                    }
+                }
+        ) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                if (portraitControlsVisible) {
+                    // Original top bar
+                    Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(
@@ -324,8 +351,10 @@ fun VideoPlayerScreen(
             )
         }
 
-        // Video and right-side overlay buttons stay in PlayerVideoArea.kt
-        PlayerVideoArea(
+                }
+
+                // Video and right-side overlay buttons stay in PlayerVideoArea.kt
+                PlayerVideoArea(
             player = controller.player,
             isLandscape = false,
             headphoneModeEnabled = headphoneModeEnabled,
@@ -333,18 +362,20 @@ fun VideoPlayerScreen(
             orientationLocked = orientationLocked,
             onToggleOrientationLock = toggleOrientationLock,
             onToggleLandscape = toggleLandscape,
+            showOverlayControls = portraitControlsVisible,
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
         )
 
-        // Original bottom controls
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(PlayerSurface)
-                .padding(horizontal = 16.dp, vertical = 10.dp)
-        ) {
+                if (portraitControlsVisible) {
+                    // Original bottom controls
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(PlayerSurface)
+                            .padding(horizontal = 16.dp, vertical = 10.dp)
+                    ) {
             // Time labels and seek bar
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -598,6 +629,8 @@ fun VideoPlayerScreen(
                 }
             }
         }
-    }
+                }
+            }
+        }
     }
 }
