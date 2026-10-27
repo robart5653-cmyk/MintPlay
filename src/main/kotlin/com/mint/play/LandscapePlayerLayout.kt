@@ -68,7 +68,8 @@ internal fun LandscapePlayerLayout(
     gestureFeedback: PlayerGestureFeedback?,
     onBrightnessPercentChange: (Int) -> Unit,
     onVolumePercentChange: (Int) -> Unit,
-    onGestureFeedback: (PlayerGestureType, Int) -> Unit
+    onGestureFeedback: (PlayerGestureType, Int) -> Unit,
+    onSeekGesture: (Boolean, Int) -> Unit
 ) {
     var controlsVisible by remember { mutableStateOf(true) }
     var touchActive by remember { mutableStateOf(false) }
@@ -104,6 +105,7 @@ internal fun LandscapePlayerLayout(
             onBrightnessPercentChange = onBrightnessPercentChange,
             onVolumePercentChange = onVolumePercentChange,
             onGestureFeedback = onGestureFeedback,
+            onSeekGesture = onSeekGesture,
             isLandscape = isLandscape,
             headphoneModeEnabled = headphoneModeEnabled,
             onToggleHeadphoneMode = onToggleHeadphoneMode,

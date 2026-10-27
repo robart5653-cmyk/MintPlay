@@ -43,13 +43,16 @@ import androidx.media3.ui.PlayerView
 
 enum class PlayerGestureType {
     Brightness,
-    Volume
+    Volume,
+    SeekBackward,
+    SeekForward
 }
 
 data class PlayerGestureFeedback(
     val type: PlayerGestureType,
     val percent: Int,
-    val eventId: Int
+    val eventId: Int,
+    val seekSeconds: Long = 0L
 )
 
 internal fun readCurrentBrightnessPercent(context: Context, activity: Activity?): Int {
@@ -87,6 +90,7 @@ internal fun PlayerVideoArea(
     onBrightnessPercentChange: (Int) -> Unit,
     onVolumePercentChange: (Int) -> Unit,
     onGestureFeedback: (PlayerGestureType, Int) -> Unit,
+    onSeekGesture: (Boolean, Int) -> Unit,
     isLandscape: Boolean,
     headphoneModeEnabled: Boolean,
     onToggleHeadphoneMode: () -> Unit,
@@ -113,14 +117,11 @@ internal fun PlayerVideoArea(
                 .pointerInput(player, seekSeconds) {
                     detectTapGestures(
                         onDoubleTap = { tap ->
-                            val seekAmount = seekSeconds.coerceAtLeast(1).toLong() * 1_000L
-                            val direction = if (tap.x < size.width / 2f) -1L else 1L
-                            val target = (player.currentPosition + direction * seekAmount)
-                                .coerceAtLeast(0L)
-                            val videoDuration = player.duration
-                            player.seekTo(
-                                if (videoDuration > 0L) target.coerceAtMost(videoDuration)
-                                else target
+                            // Left half queues a rewind; right half queues a forward skip.
+                            // The parent waits briefly so rapid taps can be combined into one seek.
+                            onSeekGesture(
+                                tap.x < size.width / 2f,
+                                seekSeconds.coerceAtLeast(1)
                             )
                         }
                     )
@@ -194,52 +195,82 @@ internal fun PlayerVideoArea(
                 color = Color.Black.copy(alpha = 0.76f),
                 shadowElevation = 4.dp
             ) {
-                Column(
-                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp),
-                    verticalArrangement = Arrangement.spacedBy(7.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                if (gestureFeedback.type == PlayerGestureType.SeekBackward ||
+                    gestureFeedback.type == PlayerGestureType.SeekForward
                 ) {
                     Row(
+                        modifier = Modifier.padding(horizontal = 22.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        horizontalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
                         Text(
-                            text = if (gestureFeedback.type == PlayerGestureType.Brightness) {
-                                "Brightness"
-                            } else {
-                                "Volume"
-                            },
-                            color = PlayerWhite,
-                            fontSize = 13.sp
-                        )
-                        Text(
-                            text = "${gestureFeedback.percent.coerceIn(0, 100)}%",
+                            text = if (gestureFeedback.type == PlayerGestureType.SeekBackward) "◀◀" else "▶▶",
                             color = PlayerMint,
-                            fontSize = 14.sp,
+                            fontSize = 27.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        val sign = if (gestureFeedback.type == PlayerGestureType.SeekBackward) "−" else "+"
+                        val seconds = gestureFeedback.seekSeconds.coerceAtLeast(0L)
+                        val amountText = if (seconds >= 60L) {
+                            "$sign${seconds / 60}:${(seconds % 60).toString().padStart(2, '0')}"
+                        } else {
+                            "$sign${seconds}s"
+                        }
+                        Text(
+                            text = amountText,
+                            color = PlayerWhite,
+                            fontSize = 18.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
-                    Canvas(
-                        modifier = Modifier
-                            .width(156.dp)
-                            .height(4.dp)
+                } else {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp),
+                        verticalArrangement = Arrangement.spacedBy(7.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        val barSize = Size(
-                            size.width * gestureFeedback.percent.coerceIn(0, 100) / 100f,
-                            size.height
-                        )
-                        val radius = CornerRadius(size.height / 2f)
-                        drawRoundRect(
-                            color = PlayerOutline,
-                            size = Size(size.width, size.height),
-                            cornerRadius = radius
-                        )
-                        if (barSize.width > 0f) {
-                            drawRoundRect(
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Text(
+                                text = if (gestureFeedback.type == PlayerGestureType.Brightness) {
+                                    "Brightness"
+                                } else {
+                                    "Volume"
+                                },
+                                color = PlayerWhite,
+                                fontSize = 13.sp
+                            )
+                            Text(
+                                text = "${gestureFeedback.percent.coerceIn(0, 100)}%",
                                 color = PlayerMint,
-                                size = barSize,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Canvas(
+                            modifier = Modifier
+                                .width(156.dp)
+                                .height(4.dp)
+                        ) {
+                            val barSize = Size(
+                                size.width * gestureFeedback.percent.coerceIn(0, 100) / 100f,
+                                size.height
+                            )
+                            val radius = CornerRadius(size.height / 2f)
+                            drawRoundRect(
+                                color = PlayerOutline,
+                                size = Size(size.width, size.height),
                                 cornerRadius = radius
                             )
+                            if (barSize.width > 0f) {
+                                drawRoundRect(
+                                    color = PlayerMint,
+                                    size = barSize,
+                                    cornerRadius = radius
+                                )
+                            }
                         }
                     }
                 }

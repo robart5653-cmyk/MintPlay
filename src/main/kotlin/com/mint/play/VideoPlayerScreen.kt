@@ -132,6 +132,9 @@ fun VideoPlayerScreen(
     }
     var gestureFeedback by remember { mutableStateOf<PlayerGestureFeedback?>(null) }
     var gestureFeedbackEventId by remember { mutableIntStateOf(0) }
+    var pendingSeekMs by remember { mutableLongStateOf(0L) }
+    var pendingSeekDirection by remember { mutableIntStateOf(0) }
+    var pendingSeekEventId by remember { mutableIntStateOf(0) }
 
     val onBrightnessPercentChange: (Int) -> Unit = { percent ->
         activity?.window?.let { window ->
@@ -152,6 +155,26 @@ fun VideoPlayerScreen(
     val onGestureFeedback: (PlayerGestureType, Int) -> Unit = { type, percent ->
         gestureFeedbackEventId += 1
         gestureFeedback = PlayerGestureFeedback(type, percent, gestureFeedbackEventId)
+    }
+    val onSeekGesture: (Boolean, Int) -> Unit = { isBackward, seconds ->
+        val direction = if (isBackward) -1 else 1
+        val incrementMs = seconds.coerceAtLeast(1).toLong() * 1_000L
+        // Repeated taps in the same direction add together. Changing direction starts a new total.
+        val nextTotalMs = if (pendingSeekMs > 0L && pendingSeekDirection == direction) {
+            pendingSeekMs + incrementMs
+        } else {
+            incrementMs
+        }
+        pendingSeekDirection = direction
+        pendingSeekMs = nextTotalMs
+        pendingSeekEventId += 1
+        gestureFeedbackEventId += 1
+        gestureFeedback = PlayerGestureFeedback(
+            type = if (isBackward) PlayerGestureType.SeekBackward else PlayerGestureType.SeekForward,
+            percent = 0,
+            eventId = gestureFeedbackEventId,
+            seekSeconds = nextTotalMs / 1_000L
+        )
     }
 
     val resumePlaybackEnabled = remember(context) {
@@ -206,6 +229,23 @@ fun VideoPlayerScreen(
 
     LaunchedEffect(controller, activity) {
         applyDefaultOrientation()
+    }
+
+    // Wait until double-taps stop arriving, then apply their combined seek once.
+    LaunchedEffect(pendingSeekEventId) {
+        if (pendingSeekMs <= 0L) return@LaunchedEffect
+        delay(650L)
+        val totalMs = pendingSeekMs
+        val direction = pendingSeekDirection
+        if (totalMs > 0L && direction != 0) {
+            val player = controller.player
+            val currentPosition = player.currentPosition.coerceAtLeast(0L)
+            val durationMs = player.duration
+            val target = (currentPosition + direction.toLong() * totalMs).coerceAtLeast(0L)
+            player.seekTo(if (durationMs > 0L) target.coerceAtMost(durationMs) else target)
+            pendingSeekMs = 0L
+            pendingSeekDirection = 0
+        }
     }
 
     LaunchedEffect(gestureFeedback?.eventId) {
@@ -344,7 +384,8 @@ fun VideoPlayerScreen(
             gestureFeedback = gestureFeedback,
             onBrightnessPercentChange = onBrightnessPercentChange,
             onVolumePercentChange = onVolumePercentChange,
-            onGestureFeedback = onGestureFeedback
+            onGestureFeedback = onGestureFeedback,
+            onSeekGesture = onSeekGesture
         )
     } else {
         var portraitControlsVisible by remember { mutableStateOf(true) }
@@ -416,6 +457,7 @@ fun VideoPlayerScreen(
             onBrightnessPercentChange = onBrightnessPercentChange,
             onVolumePercentChange = onVolumePercentChange,
             onGestureFeedback = onGestureFeedback,
+            onSeekGesture = onSeekGesture,
             isLandscape = false,
             headphoneModeEnabled = headphoneModeEnabled,
             onToggleHeadphoneMode = { headphoneModeEnabled = !headphoneModeEnabled },
