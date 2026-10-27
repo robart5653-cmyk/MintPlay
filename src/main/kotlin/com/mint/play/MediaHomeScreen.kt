@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.width
@@ -56,29 +57,6 @@ fun MediaHomeScreen(
         mutableStateOf(MediaHistoryStore.getRecentVideoUris(context))
     }
 
-    DisposableEffect(historyPreferences, selectedVideo) {
-        showHistory = MediaHistoryStore.isHistoryEnabled(context)
-        historyUris = MediaHistoryStore.getRecentVideoUris(context)
-
-        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-            when (key) {
-                MediaHistoryStore.SHOW_HISTORY_KEY -> {
-                    showHistory = MediaHistoryStore.isHistoryEnabled(context)
-                }
-                MediaHistoryStore.VIDEO_HISTORY_KEY -> {
-                    // Don't recompose the player playlist while a video is playing.
-                    if (selectedVideo == null) {
-                        historyUris = MediaHistoryStore.getRecentVideoUris(context)
-                    }
-                }
-            }
-        }
-        historyPreferences.registerOnSharedPreferenceChangeListener(listener)
-        onDispose {
-            historyPreferences.unregisterOnSharedPreferenceChangeListener(listener)
-        }
-    }
-
     val scope = rememberCoroutineScope()
     val actions = remember(context) { MediaItemActions(context) }
     val dialogState = remember { MediaActionDialogState() }
@@ -101,6 +79,33 @@ fun MediaHomeScreen(
 
     var selectedVideo by remember(isVideo) {
         mutableStateOf<MediaItem?>(null)
+    }
+
+    var showFullHistory by remember(isVideo) {
+        mutableStateOf(false)
+    }
+
+    DisposableEffect(historyPreferences, selectedVideo) {
+        showHistory = MediaHistoryStore.isHistoryEnabled(context)
+        historyUris = MediaHistoryStore.getRecentVideoUris(context)
+
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            when (key) {
+                MediaHistoryStore.SHOW_HISTORY_KEY -> {
+                    showHistory = MediaHistoryStore.isHistoryEnabled(context)
+                }
+                MediaHistoryStore.VIDEO_HISTORY_KEY -> {
+                    // Don't recompose the player playlist while a video is playing.
+                    if (selectedVideo == null) {
+                        historyUris = MediaHistoryStore.getRecentVideoUris(context)
+                    }
+                }
+            }
+        }
+        historyPreferences.registerOnSharedPreferenceChangeListener(listener)
+        onDispose {
+            historyPreferences.unregisterOnSharedPreferenceChangeListener(listener)
+        }
     }
 
     LaunchedEffect(selectedVideo, isVideo) {
@@ -208,6 +213,76 @@ fun MediaHomeScreen(
         selectedVideo = null
     }
 )
+    } else if (isVideo && showFullHistory) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = "‹",
+                    color = Accent,
+                    fontSize = 28.sp,
+                    modifier = Modifier.clickable {
+                        showFullHistory = false
+                    }
+                )
+                Text(
+                    text = "History",
+                    color = PrimaryText,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            if (historyVideos.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(text = "No history yet.", color = SecondaryText)
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(bottom = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(
+                        items = historyVideos,
+                        key = { it.uri.toString() }
+                    ) { item ->
+                        MediaItemRow(
+                            item = item,
+                            isVideo = true,
+                            onPlayVideo = { selectedVideo = item },
+                            onFavourite = {
+                                actionHandler.toggleFavourite(item.uri)
+                                favouriteUris = actions.getFavourites()
+                            },
+                            onAddToPlaylist = {
+                                dialogState.requestAddToPlaylist(item.uri)
+                            },
+                            onRename = { newName ->
+                                actionHandler.rename(item.uri, newName)
+                            },
+                            onDelete = {
+                                actionHandler.delete(item.uri)
+                            }
+                        )
+                    }
+                }
+            }
+        }
     } else {
         Column(
             modifier = Modifier
@@ -222,10 +297,13 @@ fun MediaHomeScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
-                        text = "History",
+                        text = "History  ›",
                         color = Accent,
                         fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.clickable {
+                            showFullHistory = true
+                        }
                     )
 
                     LazyRow(
