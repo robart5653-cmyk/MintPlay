@@ -1,5 +1,6 @@
 package com.mint.play
 
+import android.content.res.Configuration
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -19,6 +20,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.tooling.preview.Preview
 
 class MainActivity : ComponentActivity() {
@@ -70,6 +72,10 @@ fun MyScreen(
     onRequestPermissions: () -> Unit = {}
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
+    var playerOpen by remember { mutableStateOf(false) }
+    val configuration = LocalConfiguration.current
+    val immersiveLandscape = playerOpen &&
+        configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
     // The launcher was registered by MainActivity, not by Compose.
     LaunchedEffect(Unit) {
@@ -80,9 +86,14 @@ fun MyScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Background)
-            .windowInsetsPadding(WindowInsets.safeDrawing)
+            .then(
+                if (immersiveLandscape) Modifier
+                else Modifier.windowInsetsPadding(WindowInsets.safeDrawing)
+            )
     ) {
-        TopBar()
+        if (!playerOpen) {
+            TopBar()
+        }
 
         Column(
             modifier = Modifier
@@ -93,14 +104,17 @@ fun MyScreen(
                 selectedTab = selectedTab,
                 audioGranted = audioGranted,
                 videoGranted = videoGranted,
-                onRequestPermissions = onRequestPermissions
+                onRequestPermissions = onRequestPermissions,
+                onVideoPlayerVisibilityChanged = { playerOpen = it }
             )
         }
 
-        BottomNavigation(
-            selectedTab = selectedTab,
-            onTabSelected = { selectedTab = it }
-        )
+        if (!playerOpen) {
+            BottomNavigation(
+                selectedTab = selectedTab,
+                onTabSelected = { selectedTab = it }
+            )
+        }
     }
 }
 
