@@ -58,6 +58,36 @@ object VideoSettingsStore {
             .apply()
     }
 
+    private const val KEY_PLAYBACK_POSITION_PREFIX = "playback_position:"
+
+    fun getPlaybackPosition(context: Context, uri: String): Long {
+        return preferences(context).getLong(KEY_PLAYBACK_POSITION_PREFIX + uri, 0L)
+    }
+
+    fun setPlaybackPosition(context: Context, uri: String, positionMs: Long) {
+        val editor = preferences(context).edit()
+        val key = KEY_PLAYBACK_POSITION_PREFIX + uri
+
+        if (positionMs > 0L) {
+            editor.putLong(key, positionMs)
+        } else {
+            editor.remove(key)
+        }
+
+        editor.apply()
+    }
+
+    fun clearPlaybackPositions(context: Context) {
+        val prefs = preferences(context)
+        val editor = prefs.edit()
+
+        prefs.all.keys
+            .filter { it.startsWith(KEY_PLAYBACK_POSITION_PREFIX) }
+            .forEach { editor.remove(it) }
+
+        editor.apply()
+    }
+
     fun getSubtitlesPreference(context: Context): String {
         return preferences(context).getString(
             KEY_SUBTITLES,

@@ -116,14 +116,53 @@ fun VideoPlayerScreen(
     }
 
     val speeds = listOf(1f, 1.25f, 1.5f, 2f)
+    val resumePlaybackEnabled = remember(context) {
+        VideoSettingsStore.getResumePlayback(context)
+    }
+    val defaultOrientation = remember(context) {
+        VideoSettingsStore.getDefaultOrientation(context)
+    }
+
+    val applyDefaultOrientation = {
+        activity?.requestedOrientation = when (defaultOrientation) {
+            "Portrait" -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            "Landscape" -> ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+            else -> ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        }
+    }
+
+    val saveCurrentPlaybackPosition: () -> Unit = {
+        val player = controller.player
+        val currentUri = player.currentMediaItem
+            ?.localConfiguration
+            ?.uri
+            ?.toString()
+
+        if (resumePlaybackEnabled && currentUri != null) {
+            val currentPosition = player.currentPosition.coerceAtLeast(0L)
+            val videoDuration = player.duration
+
+            // A finished video should start from the beginning next time.
+            if (videoDuration > 0L && currentPosition >= videoDuration - 2_000L) {
+                VideoSettingsStore.setPlaybackPosition(context, currentUri, 0L)
+            } else {
+                VideoSettingsStore.setPlaybackPosition(context, currentUri, currentPosition)
+            }
+        }
+    }
 
     DisposableEffect(controller, activity, originalSystemUiVisibility) {
         onDispose {
+            saveCurrentPlaybackPosition()
             activity?.requestedOrientation =
                 ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
             activity?.window?.decorView?.systemUiVisibility = originalSystemUiVisibility
             controller.release()
         }
+    }
+
+    LaunchedEffect(controller, activity) {
+        applyDefaultOrientation()
     }
 
     LaunchedEffect(isLandscape, activity, originalSystemUiVisibility) {
@@ -146,10 +185,10 @@ fun VideoPlayerScreen(
     val toggleOrientationLock = {
         val nextLocked = !orientationLocked
         orientationLocked = nextLocked
-        activity?.requestedOrientation = if (nextLocked) {
-            ActivityInfo.SCREEN_ORIENTATION_LOCKED
+        if (nextLocked) {
+            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LOCKED
         } else {
-            ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            applyDefaultOrientation()
         }
     }
 
@@ -163,8 +202,26 @@ fun VideoPlayerScreen(
     }
 
     LaunchedEffect(controller, activeUri) {
+        if (!resumePlaybackEnabled) {
+            // Turning this setting off means videos always start at the beginning.
+            VideoSettingsStore.clearPlaybackPositions(context)
+        }
+
+        // Save the previous playlist item before switching to the next one.
+        saveCurrentPlaybackPosition()
+
         if (activeUri != null) {
             controller.play(activeUri)
+
+            if (resumePlaybackEnabled) {
+                val savedPosition = VideoSettingsStore.getPlaybackPosition(
+                    context,
+                    activeUri.toString()
+                )
+                if (savedPosition > 0L) {
+                    controller.seekTo(savedPosition)
+                }
+            }
         }
 
         position = 0L
@@ -174,16 +231,22 @@ fun VideoPlayerScreen(
     }
 
     LaunchedEffect(controller) {
+        var lastPositionSaveAt = 0L
+
         while (true) {
             val player = controller.player
 
-            if (player != null) {
-                if (!isScrubbing) {
-                    position = player.currentPosition.coerceAtLeast(0L)
-                }
+            if (!isScrubbing) {
+                position = player.currentPosition.coerceAtLeast(0L)
+            }
 
-                duration = player.duration.coerceAtLeast(0L)
-                isPlaying = player.isPlaying
+            duration = player.duration.coerceAtLeast(0L)
+            isPlaying = player.isPlaying
+
+            val now = System.currentTimeMillis()
+            if (now - lastPositionSaveAt >= 1_000L) {
+                saveCurrentPlaybackPosition()
+                lastPositionSaveAt = now
             }
 
             delay(250)
