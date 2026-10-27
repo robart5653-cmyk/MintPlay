@@ -81,6 +81,17 @@ fun MediaHomeScreen(
         mutableStateOf<MediaItem?>(null)
     }
 
+    // Update the app shell in the same click event to avoid a one-frame flash
+    // of the home bars before the player takes over.
+    val openVideo: (MediaItem) -> Unit = { item ->
+        onVideoPlayerVisibilityChanged(true)
+        selectedVideo = item
+    }
+    val closeVideo: () -> Unit = {
+        onVideoPlayerVisibilityChanged(false)
+        selectedVideo = null
+    }
+
     var showFullHistory by remember(isVideo) {
         mutableStateOf(false)
     }
@@ -157,7 +168,7 @@ fun MediaHomeScreen(
             reloadLibrary()
         } else {
             mediaItems = emptyList()
-            selectedVideo = null
+            closeVideo()
             loading = false
         }
     }
@@ -210,7 +221,7 @@ fun MediaHomeScreen(
     videoTitles = playerVideos.map { it.name },
     initialIndex = playerIndex,
     onBack = {
-        selectedVideo = null
+        closeVideo()
     }
 )
     } else if (isVideo && showFullHistory) {
@@ -238,7 +249,10 @@ fun MediaHomeScreen(
                     text = "History",
                     color = PrimaryText,
                     fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.clickable {
+                        showFullHistory = false
+                    }
                 )
             }
 
@@ -264,7 +278,7 @@ fun MediaHomeScreen(
                         MediaItemRow(
                             item = item,
                             isVideo = true,
-                            onPlayVideo = { selectedVideo = item },
+                            onPlayVideo = { openVideo(item) },
                             onFavourite = {
                                 actionHandler.toggleFavourite(item.uri)
                                 favouriteUris = actions.getFavourites()
@@ -299,8 +313,8 @@ fun MediaHomeScreen(
                     Text(
                         text = "History  ›",
                         color = Accent,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold,
                         modifier = Modifier.clickable {
                             showFullHistory = true
                         }
@@ -319,7 +333,7 @@ fun MediaHomeScreen(
                                 modifier = Modifier
                                     .width(128.dp)
                                     .aspectRatio(16f / 9f)
-                                    .clickable { selectedVideo = item }
+                                    .clickable { openVideo(item) }
                             )
                         }
                     }
@@ -432,7 +446,7 @@ fun MediaHomeScreen(
                                 isVideo = isVideo,
                                 onPlayVideo = {
                                     if (isVideo) {
-                                        selectedVideo = item
+                                        openVideo(item)
                                     }
                                 },
                                 onFavourite = {
