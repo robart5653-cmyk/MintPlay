@@ -17,19 +17,22 @@ fun HomeScreen(
     selectedTab: Int,
     audioGranted: Boolean = false,
     videoGranted: Boolean = false,
-    onRequestPermissions: () -> Unit = {}
+    onRequestPermissions: () -> Unit = {},
+    onVideoPlayerVisibilityChanged: (Boolean) -> Unit = {}
 ) {
     when (selectedTab) {
         0 -> MediaHomeScreen(
             isVideo = true,
             permissionGranted = videoGranted,
-            onRequestPermissions = onRequestPermissions
+            onRequestPermissions = onRequestPermissions,
+            onVideoPlayerVisibilityChanged = onVideoPlayerVisibilityChanged
         )
 
         1 -> MediaHomeScreen(
             isVideo = false,
             permissionGranted = audioGranted,
-            onRequestPermissions = onRequestPermissions
+            onRequestPermissions = onRequestPermissions,
+            onVideoPlayerVisibilityChanged = onVideoPlayerVisibilityChanged
         )
 
         2 -> PlaceholderScreen(
