@@ -4,8 +4,11 @@ package com.mint.play
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import android.content.res.Configuration
 import android.content.pm.ActivityInfo
+import android.view.View
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -38,6 +41,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -53,9 +57,14 @@ fun VideoPlayerScreen(
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
     val activity = remember(context) {
         context.findActivity()
+    }
+    val originalSystemUiVisibility = remember(activity) {
+        activity?.window?.decorView?.systemUiVisibility ?: 0
     }
 
     val controller = remember(context) {
@@ -90,6 +99,14 @@ fun VideoPlayerScreen(
         mutableIntStateOf(0)
     }
 
+    var headphoneModeEnabled by remember {
+        mutableStateOf(false)
+    }
+
+    var orientationLocked by remember {
+        mutableStateOf(false)
+    }
+
     var scrubPosition by remember {
         mutableFloatStateOf(0f)
     }
@@ -100,12 +117,48 @@ fun VideoPlayerScreen(
 
     val speeds = listOf(1f, 1.25f, 1.5f, 2f)
 
-    DisposableEffect(controller, activity) {
+    DisposableEffect(controller, activity, originalSystemUiVisibility) {
         onDispose {
             activity?.requestedOrientation =
                 ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-
+            activity?.window?.decorView?.systemUiVisibility = originalSystemUiVisibility
             controller.release()
+        }
+    }
+
+    LaunchedEffect(isLandscape, activity, originalSystemUiVisibility) {
+        val decorView = activity?.window?.decorView ?: return@LaunchedEffect
+        decorView.systemUiVisibility = if (isLandscape) {
+            originalSystemUiVisibility or
+                View.SYSTEM_UI_FLAG_LAYOUT_STABLE or
+                View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
+                View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or
+                View.SYSTEM_UI_FLAG_FULLSCREEN or
+                View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+                View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+        } else {
+            originalSystemUiVisibility
+        }
+    }
+
+    BackHandler(enabled = true, onBack = onBack)
+
+    val toggleOrientationLock = {
+        val nextLocked = !orientationLocked
+        orientationLocked = nextLocked
+        activity?.requestedOrientation = if (nextLocked) {
+            ActivityInfo.SCREEN_ORIENTATION_LOCKED
+        } else {
+            ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        }
+    }
+
+    val toggleLandscape = {
+        orientationLocked = false
+        activity?.requestedOrientation = if (isLandscape) {
+            ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        } else {
+            ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
         }
     }
 
@@ -137,6 +190,42 @@ fun VideoPlayerScreen(
         }
     }
 
+    if (isLandscape) {
+        LandscapePlayerLayout(
+            player = controller.player,
+            isLandscape = true,
+            onToggleLandscape = toggleLandscape,
+            headphoneModeEnabled = headphoneModeEnabled,
+            onToggleHeadphoneMode = { headphoneModeEnabled = !headphoneModeEnabled },
+            orientationLocked = orientationLocked,
+            onToggleOrientationLock = toggleOrientationLock,
+            activeTitle = activeTitle,
+            onBack = onBack,
+            position = position,
+            duration = duration,
+            progress = (if (isScrubbing) scrubPosition else if (duration > 0L) position.toFloat() / duration.toFloat() else 0f).coerceIn(0f, 1f),
+            onScrubChange = {
+                scrubPosition = it
+                isScrubbing = true
+            },
+            onScrubFinished = {
+                if (duration > 0L) controller.seekTo((scrubPosition * duration).toLong())
+                isScrubbing = false
+            },
+            isPlaying = isPlaying,
+            canPrevious = currentIndex > 0,
+            onPrevious = { if (currentIndex > 0) currentIndex-- },
+            onTogglePlayPause = { controller.togglePlayPause() },
+            canNext = currentIndex < videoUris.lastIndex,
+            onNext = { if (currentIndex < videoUris.lastIndex) currentIndex++ },
+            speedLabel = "${speeds[speedIndex]}×",
+            onSpeedClick = {
+                val nextSpeedIndex = (speedIndex + 1) % speeds.size
+                speedIndex = nextSpeedIndex
+                controller.setSpeed(speeds[nextSpeedIndex])
+            }
+        )
+    } else {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -175,7 +264,12 @@ fun VideoPlayerScreen(
         // Video and right-side overlay buttons stay in PlayerVideoArea.kt
         PlayerVideoArea(
             player = controller.player,
-            activity = activity,
+            isLandscape = false,
+            headphoneModeEnabled = headphoneModeEnabled,
+            onToggleHeadphoneMode = { headphoneModeEnabled = !headphoneModeEnabled },
+            orientationLocked = orientationLocked,
+            onToggleOrientationLock = toggleOrientationLock,
+            onToggleLandscape = toggleLandscape,
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
@@ -417,8 +511,9 @@ fun VideoPlayerScreen(
 
                     Surface(
                         onClick = {
-                            speedIndex = (speedIndex + 1) % speeds.size
-                            controller.setSpeed(speeds[speedIndex])
+                            val nextSpeedIndex = (speedIndex + 1) % speeds.size
+                            speedIndex = nextSpeedIndex
+                            controller.setSpeed(speeds[nextSpeedIndex])
                         },
                         shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
                         color = PlayerBackground,
@@ -440,5 +535,6 @@ fun VideoPlayerScreen(
                 }
             }
         }
+    }
     }
 }
