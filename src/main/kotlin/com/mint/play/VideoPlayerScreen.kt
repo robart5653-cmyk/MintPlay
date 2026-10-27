@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.content.res.Configuration
 import android.content.pm.ActivityInfo
+import android.media.AudioManager
 import android.view.View
 import android.net.Uri
 import androidx.activity.compose.BackHandler
@@ -50,6 +51,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.Player
+import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 
 @Composable
@@ -68,6 +70,12 @@ fun VideoPlayerScreen(
     }
     val originalSystemUiVisibility = remember(activity) {
         activity?.window?.decorView?.systemUiVisibility ?: 0
+    }
+    val originalWindowBrightness = remember(activity) {
+        activity?.window?.attributes?.screenBrightness ?: -1f
+    }
+    val audioManager = remember(context) {
+        context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     }
 
     val controller = remember(context) {
@@ -119,6 +127,33 @@ fun VideoPlayerScreen(
     }
 
     val speeds = listOf(1f, 1.25f, 1.5f, 2f)
+    val doubleTapSeekSeconds = remember(context) {
+        VideoSettingsStore.getDoubleTapSeekSeconds(context)
+    }
+    var gestureFeedback by remember { mutableStateOf<PlayerGestureFeedback?>(null) }
+    var gestureFeedbackEventId by remember { mutableIntStateOf(0) }
+
+    val onBrightnessPercentChange: (Int) -> Unit = { percent ->
+        activity?.window?.let { window ->
+            val attributes = window.attributes
+            attributes.screenBrightness = percent.coerceIn(0, 100) / 100f
+            window.attributes = attributes
+        }
+    }
+    val onVolumePercentChange: (Int) -> Unit = { percent ->
+        val maximum = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+        if (maximum > 0) {
+            val targetVolume = (maximum * percent.coerceIn(0, 100) / 100f)
+                .roundToInt()
+                .coerceIn(0, maximum)
+            audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, targetVolume, 0)
+        }
+    }
+    val onGestureFeedback: (PlayerGestureType, Int) -> Unit = { type, percent ->
+        gestureFeedbackEventId += 1
+        gestureFeedback = PlayerGestureFeedback(type, percent, gestureFeedbackEventId)
+    }
+
     val resumePlaybackEnabled = remember(context) {
         VideoSettingsStore.getResumePlayback(context)
     }
@@ -160,12 +195,25 @@ fun VideoPlayerScreen(
             activity?.requestedOrientation =
                 ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
             activity?.window?.decorView?.systemUiVisibility = originalSystemUiVisibility
+            activity?.window?.let { window ->
+                val attributes = window.attributes
+                attributes.screenBrightness = originalWindowBrightness
+                window.attributes = attributes
+            }
             controller.release()
         }
     }
 
     LaunchedEffect(controller, activity) {
         applyDefaultOrientation()
+    }
+
+    LaunchedEffect(gestureFeedback?.eventId) {
+        val currentFeedback = gestureFeedback ?: return@LaunchedEffect
+        delay(5_000L)
+        if (gestureFeedback?.eventId == currentFeedback.eventId) {
+            gestureFeedback = null
+        }
     }
 
     LaunchedEffect(isLandscape, activity, originalSystemUiVisibility) {
@@ -290,7 +338,13 @@ fun VideoPlayerScreen(
                 val nextSpeedIndex = (speedIndex + 1) % speeds.size
                 speedIndex = nextSpeedIndex
                 controller.setSpeed(speeds[nextSpeedIndex])
-            }
+            },
+            activity = activity,
+            seekSeconds = doubleTapSeekSeconds,
+            gestureFeedback = gestureFeedback,
+            onBrightnessPercentChange = onBrightnessPercentChange,
+            onVolumePercentChange = onVolumePercentChange,
+            onGestureFeedback = onGestureFeedback
         )
     } else {
         var portraitControlsVisible by remember { mutableStateOf(true) }
@@ -356,6 +410,12 @@ fun VideoPlayerScreen(
                 // Video and right-side overlay buttons stay in PlayerVideoArea.kt
                 PlayerVideoArea(
             player = controller.player,
+            activity = activity,
+            seekSeconds = doubleTapSeekSeconds,
+            gestureFeedback = gestureFeedback,
+            onBrightnessPercentChange = onBrightnessPercentChange,
+            onVolumePercentChange = onVolumePercentChange,
+            onGestureFeedback = onGestureFeedback,
             isLandscape = false,
             headphoneModeEnabled = headphoneModeEnabled,
             onToggleHeadphoneMode = { headphoneModeEnabled = !headphoneModeEnabled },

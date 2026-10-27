@@ -312,7 +312,7 @@ fun MediaHomeScreen(
                 ) {
                     Text(
                         text = "History  ›",
-                        color = Accent,
+                        color = PrimaryText,
                         fontSize = 24.sp,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.clickable {

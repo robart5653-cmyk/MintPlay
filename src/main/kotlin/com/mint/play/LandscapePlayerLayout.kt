@@ -1,5 +1,6 @@
 package com.mint.play
 
+import android.app.Activity
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -61,7 +62,13 @@ internal fun LandscapePlayerLayout(
     canNext: Boolean,
     onNext: () -> Unit,
     speedLabel: String,
-    onSpeedClick: () -> Unit
+    onSpeedClick: () -> Unit,
+    activity: Activity?,
+    seekSeconds: Int,
+    gestureFeedback: PlayerGestureFeedback?,
+    onBrightnessPercentChange: (Int) -> Unit,
+    onVolumePercentChange: (Int) -> Unit,
+    onGestureFeedback: (PlayerGestureType, Int) -> Unit
 ) {
     var controlsVisible by remember { mutableStateOf(true) }
     var touchActive by remember { mutableStateOf(false) }
@@ -91,6 +98,12 @@ internal fun LandscapePlayerLayout(
     ) {
         PlayerVideoArea(
             player = player,
+            activity = activity,
+            seekSeconds = seekSeconds,
+            gestureFeedback = gestureFeedback,
+            onBrightnessPercentChange = onBrightnessPercentChange,
+            onVolumePercentChange = onVolumePercentChange,
+            onGestureFeedback = onGestureFeedback,
             isLandscape = isLandscape,
             headphoneModeEnabled = headphoneModeEnabled,
             onToggleHeadphoneMode = onToggleHeadphoneMode,
