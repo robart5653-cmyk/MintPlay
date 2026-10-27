@@ -30,6 +30,8 @@ internal fun PlayerVideoArea(
     orientationLocked: Boolean,
     onToggleOrientationLock: () -> Unit,
     onToggleLandscape: () -> Unit,
+    showOverlayControls: Boolean = true,
+    transparentControlBackground: Boolean = false,
     modifier: Modifier = Modifier
 ) {
 
@@ -52,64 +54,66 @@ internal fun PlayerVideoArea(
             }
         )
 
-        Column(
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .padding(end = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Surface(
-                modifier = Modifier.size(48.dp),
-                shape = CircleShape,
-                color = Color.Black.copy(alpha = 0.45f)
+        if (showOverlayControls) {
+            Column(
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .padding(end = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                IconButton(
-                    onClick = onToggleHeadphoneMode
+                Surface(
+                    modifier = Modifier.size(48.dp),
+                    shape = CircleShape,
+                    color = if (transparentControlBackground) Color.Transparent else Color.Black.copy(alpha = 0.45f)
                 ) {
-                    // CHANGE ICON SIZE HERE: replace 24.dp with your preferred size.
-                    HeadphoneIcon(
-                        modifier = Modifier.size(24.dp),
-                        color = if (headphoneModeEnabled) {
-                            PlayerMint
-                        } else {
-                            Color.White
-                        }
-                    )
+                    IconButton(
+                        onClick = onToggleHeadphoneMode
+                    ) {
+                        // CHANGE ICON SIZE HERE: replace 24.dp with your preferred size.
+                        HeadphoneIcon(
+                            modifier = Modifier.size(24.dp),
+                            color = if (headphoneModeEnabled) {
+                                PlayerMint
+                            } else {
+                                Color.White
+                            }
+                        )
+                    }
                 }
-            }
 
-            Surface(
-                modifier = Modifier.size(48.dp),
-                shape = CircleShape,
-                color = Color.Black.copy(alpha = 0.45f)
-            ) {
-                IconButton(
-                    onClick = onToggleOrientationLock
+                Surface(
+                    modifier = Modifier.size(48.dp),
+                    shape = CircleShape,
+                    color = if (transparentControlBackground) Color.Transparent else Color.Black.copy(alpha = 0.45f)
                 ) {
-                    // CHANGE ICON SIZE HERE: replace 24.dp with your preferred size.
-                    OrientationLockIcon(
-                        modifier = Modifier.size(24.dp),
-                        locked = orientationLocked,
-                        color = if (orientationLocked) {
-                            PlayerMint
-                        } else {
-                            Color.White
-                        }
-                    )
+                    IconButton(
+                        onClick = onToggleOrientationLock
+                    ) {
+                        // CHANGE ICON SIZE HERE: replace 24.dp with your preferred size.
+                        OrientationLockIcon(
+                            modifier = Modifier.size(24.dp),
+                            locked = orientationLocked,
+                            color = if (orientationLocked) {
+                                PlayerMint
+                            } else {
+                                Color.White
+                            }
+                        )
+                    }
                 }
-            }
 
-            Surface(
-                modifier = Modifier.size(48.dp),
-                shape = CircleShape,
-                color = Color.Black.copy(alpha = 0.45f)
-            ) {
-                IconButton(onClick = onToggleLandscape) {
-                    LandscapeModeIcon(
-                        modifier = Modifier.size(24.dp),
-                        color = if (isLandscape) PlayerMint else Color.White
-                    )
+                Surface(
+                    modifier = Modifier.size(48.dp),
+                    shape = CircleShape,
+                    color = if (transparentControlBackground) Color.Transparent else Color.Black.copy(alpha = 0.45f)
+                ) {
+                    IconButton(onClick = onToggleLandscape) {
+                        LandscapeModeIcon(
+                            modifier = Modifier.size(24.dp),
+                            color = if (isLandscape) PlayerMint else Color.White
+                        )
+                    }
                 }
             }
         }
