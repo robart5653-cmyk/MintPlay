@@ -171,3 +171,26 @@ internal fun HollowPlayIcon(
         )
     }
 }
+
+@Composable
+internal fun LandscapeModeIcon(
+    modifier: Modifier = Modifier,
+    color: Color
+) {
+    Canvas(modifier = modifier) {
+        val stroke = 2.dp.toPx()
+        val x = size.width * 0.18f
+        val y = size.height * 0.18f
+        val dx = size.width * 0.24f
+        val dy = size.height * 0.24f
+
+        drawLine(color = color, start = Offset(x, y + dy), end = Offset(x, y), strokeWidth = stroke, cap = StrokeCap.Round)
+        drawLine(color = color, start = Offset(x, y), end = Offset(x + dx, y), strokeWidth = stroke, cap = StrokeCap.Round)
+        drawLine(color = color, start = Offset(size.width - x - dx, y), end = Offset(size.width - x, y), strokeWidth = stroke, cap = StrokeCap.Round)
+        drawLine(color = color, start = Offset(size.width - x, y), end = Offset(size.width - x, y + dy), strokeWidth = stroke, cap = StrokeCap.Round)
+        drawLine(color = color, start = Offset(x, size.height - y - dy), end = Offset(x, size.height - y), strokeWidth = stroke, cap = StrokeCap.Round)
+        drawLine(color = color, start = Offset(x, size.height - y), end = Offset(x + dx, size.height - y), strokeWidth = stroke, cap = StrokeCap.Round)
+        drawLine(color = color, start = Offset(size.width - x - dx, size.height - y), end = Offset(size.width - x, size.height - y), strokeWidth = stroke, cap = StrokeCap.Round)
+        drawLine(color = color, start = Offset(size.width - x, size.height - y - dy), end = Offset(size.width - x, size.height - y), strokeWidth = stroke, cap = StrokeCap.Round)
+    }
+}
