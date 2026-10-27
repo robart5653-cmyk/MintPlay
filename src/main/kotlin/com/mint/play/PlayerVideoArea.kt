@@ -1,8 +1,6 @@
 
 package com.mint.play
 
-import android.app.Activity
-import android.content.pm.ActivityInfo
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,10 +12,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -30,16 +24,14 @@ import androidx.media3.ui.PlayerView
 @Composable
 internal fun PlayerVideoArea(
     player: ExoPlayer,
-    activity: Activity?,
+    isLandscape: Boolean,
+    headphoneModeEnabled: Boolean,
+    onToggleHeadphoneMode: () -> Unit,
+    orientationLocked: Boolean,
+    onToggleOrientationLock: () -> Unit,
+    onToggleLandscape: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var headphoneModeEnabled by remember {
-        mutableStateOf(false)
-    }
-
-    var orientationLocked by remember {
-        mutableStateOf(false)
-    }
 
     Box(
         modifier = modifier
@@ -73,9 +65,7 @@ internal fun PlayerVideoArea(
                 color = Color.Black.copy(alpha = 0.45f)
             ) {
                 IconButton(
-                    onClick = {
-                        headphoneModeEnabled = !headphoneModeEnabled
-                    }
+                    onClick = onToggleHeadphoneMode
                 ) {
                     // CHANGE ICON SIZE HERE: replace 24.dp with your preferred size.
                     HeadphoneIcon(
@@ -95,16 +85,7 @@ internal fun PlayerVideoArea(
                 color = Color.Black.copy(alpha = 0.45f)
             ) {
                 IconButton(
-                    onClick = {
-                        orientationLocked = !orientationLocked
-
-                        activity?.requestedOrientation =
-                            if (orientationLocked) {
-                                ActivityInfo.SCREEN_ORIENTATION_LOCKED
-                            } else {
-                                ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-                            }
-                    }
+                    onClick = onToggleOrientationLock
                 ) {
                     // CHANGE ICON SIZE HERE: replace 24.dp with your preferred size.
                     OrientationLockIcon(
@@ -115,6 +96,19 @@ internal fun PlayerVideoArea(
                         } else {
                             Color.White
                         }
+                    )
+                }
+            }
+
+            Surface(
+                modifier = Modifier.size(48.dp),
+                shape = CircleShape,
+                color = Color.Black.copy(alpha = 0.45f)
+            ) {
+                IconButton(onClick = onToggleLandscape) {
+                    LandscapeModeIcon(
+                        modifier = Modifier.size(24.dp),
+                        color = if (isLandscape) PlayerMint else Color.White
                     )
                 }
             }
