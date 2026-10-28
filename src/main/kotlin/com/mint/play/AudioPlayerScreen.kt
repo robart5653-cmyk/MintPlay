@@ -1,6 +1,12 @@
 package com.mint.play
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -8,6 +14,7 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -34,7 +41,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.font.FontWeight
@@ -106,7 +116,15 @@ fun AudioPlayerScreen(
             )
         }
 
-        Spacer(modifier = Modifier.weight(1f))
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+            contentAlignment = Alignment.Center
+        ) {
+            val artworkSize = minOf(maxWidth * 0.82f, maxHeight * 0.94f, 320.dp)
+            MintPlayArtwork(modifier = Modifier.size(artworkSize))
+        }
 
         AudioSeekBar(controller)
         Row(
@@ -220,6 +238,39 @@ fun AudioPlayerScreen(
                 }
             },
             containerColor = NavBackground
+        )
+    }
+}
+
+@Composable
+private fun MintPlayArtwork(modifier: Modifier = Modifier) {
+    // Positive rotationZ turns clockwise in Compose's screen coordinate system.
+    val rotation by rememberInfiniteTransition(label = "MintPlayDisc")
+        .animateFloat(
+            initialValue = 0f,
+            targetValue = 360f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 18_000, easing = LinearEasing)
+            ),
+            label = "MintPlayDiscRotation"
+        )
+
+    // The SVG was split into two transparent layers: only the disc rotates;
+    // the MintPlay wordmark stays aligned and completely still above it.
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+        Image(
+            painter = painterResource(id = R.drawable.mintplay_disc),
+            contentDescription = null,
+            contentScale = ContentScale.Fit,
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer { rotationZ = rotation }
+        )
+        Image(
+            painter = painterResource(id = R.drawable.mintplay_wordmark),
+            contentDescription = "MintPlay",
+            contentScale = ContentScale.Fit,
+            modifier = Modifier.fillMaxSize()
         )
     }
 }
