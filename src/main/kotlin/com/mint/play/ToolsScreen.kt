@@ -1,6 +1,7 @@
 package com.mint.play
 
 import android.content.Context
+import android.content.Intent
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Handler
@@ -44,6 +45,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.transformer.Transformer
 import java.util.Locale
 import kotlin.concurrent.thread
@@ -51,6 +53,7 @@ import kotlin.concurrent.thread
 private enum class MediaTool { VIDEO_TO_AUDIO, TRIM_MEDIA }
 private const val MIN_TRIM_MS = 500L
 
+@OptIn(UnstableApi::class)
 @Composable
 fun ToolsScreen() {
     val context = LocalContext.current
@@ -155,10 +158,22 @@ fun ToolsScreen() {
                 extension in setOf("mp4", "mkv", "webm", "mov", "3gp", "avi", "m4v")
 
             if (selectedTool == MediaTool.VIDEO_TO_AUDIO && !video) {
+                sourceUri = null
+                sourceName = null
+                durationMs = 0L
                 errorMessage = "Choose a video file that contains an audio track."
             } else if (!audio && !video) {
+                sourceUri = null
+                sourceName = null
+                durationMs = 0L
                 errorMessage = "Choose a supported audio or video file."
             } else {
+                runCatching {
+                    context.contentResolver.takePersistableUriPermission(
+                        uri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    )
+                }
                 sourceUri = uri
                 sourceName = name
                 sourceIsAudio = audio
@@ -294,7 +309,7 @@ fun ToolsScreen() {
                     Slider(
                         value = trimStartMs.toFloat(),
                         onValueChange = { trimStartMs = it.toLong().coerceAtMost((trimEndMs - MIN_TRIM_MS).coerceAtLeast(0L)) },
-                        valueRange = 0f..durationMs.toFloat(),
+                        valueRange = 0f..(durationMs - MIN_TRIM_MS).toFloat(),
                         enabled = !processing,
                         colors = SliderDefaults.colors(thumbColor = Accent, activeTrackColor = Accent, inactiveTrackColor = Inactive)
                     )
