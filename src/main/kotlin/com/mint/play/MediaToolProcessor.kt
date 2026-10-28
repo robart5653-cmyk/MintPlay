@@ -32,7 +32,10 @@ internal class MediaToolProcessor(context: Context) {
         onFinished: (Result<Unit>) -> Unit
     ): Transformer {
         val extension = if (outputIsAudio) "m4a" else "mp4"
-        val outputFile = File(appContext.cacheDir, "mintplay_tool_${System.currentTimeMillis()}.$extension")
+        val outputFile = File(
+            appContext.cacheDir,
+            "mintplay_tool_${System.currentTimeMillis()}.$extension"
+        )
         val mediaItemBuilder = MediaItem.Builder().setUri(sourceUri)
 
         if (startMs != null && endMs != null) {
@@ -52,14 +55,21 @@ internal class MediaToolProcessor(context: Context) {
             .setAudioMimeType(MimeTypes.AUDIO_AAC)
             .setVideoMimeType(MimeTypes.VIDEO_H264)
             .addListener(object : Transformer.Listener {
-                override fun onCompleted(composition: Composition, exportResult: ExportResult) {
+                override fun onCompleted(
+                    composition: Composition,
+                    exportResult: ExportResult
+                ) {
                     thread(name = "MintPlayOutputCopy") {
-                        val result = runCatching {
-                            val output = appContext.contentResolver.openOutputStream(destinationUri)
+                        val result: Result<Unit> = runCatching {
+                            val output = appContext.contentResolver
+                                .openOutputStream(destinationUri)
                                 ?: throw IOException("Couldn't open the save location.")
                             output.use { destination ->
-                                FileInputStream(outputFile).use { input -> input.copyTo(destination) }
+                                FileInputStream(outputFile).use { input ->
+                                    input.copyTo(destination)
+                                }
                             }
+                            Unit
                         }
                         outputFile.delete()
                         mainHandler.post { onFinished(result) }
@@ -72,7 +82,9 @@ internal class MediaToolProcessor(context: Context) {
                     exportException: ExportException
                 ) {
                     outputFile.delete()
-                    mainHandler.post { onFinished(Result.failure(exportException)) }
+                    mainHandler.post {
+                        onFinished(Result.failure(exportException))
+                    }
                 }
             })
             .build()
