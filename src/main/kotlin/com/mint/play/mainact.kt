@@ -108,7 +108,9 @@ fun MyScreen(
                 else Modifier.windowInsetsPadding(WindowInsets.safeDrawing)
             )
     ) {
-        if (!playerOpen) {
+        val audioPlayerVisible = showAudioPlayer && selectedTab == 1
+
+        if (!playerOpen && !audioPlayerVisible) {
             TopBar()
         }
 
@@ -147,7 +149,7 @@ fun MyScreen(
             )
         }
 
-        if (!playerOpen) {
+        if (!playerOpen && !audioPlayerVisible) {
             BottomNavigation(
                 selectedTab = selectedTab,
                 onTabSelected = { selectedTab = it }

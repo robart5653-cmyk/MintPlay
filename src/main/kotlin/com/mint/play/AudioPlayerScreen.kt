@@ -9,6 +9,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -70,16 +71,22 @@ fun AudioPlayerScreen(
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold
             )
-            TextButton(onClick = { showQueue = true }) {
-                Text("☷", color = PlayerWhite, fontSize = 24.sp)
+            TextButton(
+                onClick = { showQueue = true },
+                contentPadding = PaddingValues(8.dp)
+            ) {
+                AudioQueueIcon(
+                    modifier = Modifier.size(24.dp),
+                    color = PlayerWhite
+                )
             }
         }
 
-        Spacer(modifier = Modifier.weight(1f))
-
         Column(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 12.dp),
+            horizontalAlignment = Alignment.Start,
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
@@ -117,15 +124,23 @@ fun AudioPlayerScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            TextButton(onClick = controller::toggleShuffle) {
-                Text(
-                    "⇄",
-                    color = if (controller.shuffleEnabled) PlayerMint else PlayerMuted,
-                    fontSize = 23.sp
+            TextButton(
+                onClick = controller::toggleShuffle,
+                contentPadding = PaddingValues(8.dp)
+            ) {
+                AudioShuffleIcon(
+                    modifier = Modifier.size(24.dp),
+                    color = if (controller.shuffleEnabled) PlayerMint else PlayerMuted
                 )
             }
-            TextButton(onClick = controller::previous) {
-                Text("|◀", color = PlayerWhite, fontSize = 19.sp)
+            TextButton(
+                onClick = controller::previous,
+                contentPadding = PaddingValues(8.dp)
+            ) {
+                PreviousTrackIcon(
+                    modifier = Modifier.size(25.dp),
+                    color = PlayerWhite
+                )
             }
             TextButton(onClick = controller::togglePlayPause) {
                 if (controller.isPlaying) {
@@ -137,14 +152,23 @@ fun AudioPlayerScreen(
                     )
                 }
             }
-            TextButton(onClick = controller::next) {
-                Text("▶︎|", color = PlayerWhite, fontSize = 19.sp)
+            TextButton(
+                onClick = controller::next,
+                contentPadding = PaddingValues(8.dp)
+            ) {
+                NextTrackIcon(
+                    modifier = Modifier.size(25.dp),
+                    color = PlayerWhite
+                )
             }
-            TextButton(onClick = controller::cycleRepeatMode) {
-                Text(
-                    if (controller.repeatMode == androidx.media3.common.Player.REPEAT_MODE_ONE) "↻¹" else "↻",
+            TextButton(
+                onClick = controller::cycleRepeatMode,
+                contentPadding = PaddingValues(8.dp)
+            ) {
+                AudioRepeatIcon(
+                    modifier = Modifier.size(24.dp),
                     color = if (controller.repeatMode == androidx.media3.common.Player.REPEAT_MODE_OFF) PlayerMuted else PlayerMint,
-                    fontSize = 22.sp
+                    repeatOne = controller.repeatMode == androidx.media3.common.Player.REPEAT_MODE_ONE
                 )
             }
         }
