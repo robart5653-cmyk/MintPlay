@@ -131,10 +131,10 @@ object MediaLibrary {
             MediaStore.MediaColumns.DISPLAY_NAME,
             MediaStore.MediaColumns.SIZE,
             durationColumn,
-            MediaStore.MediaColumns.DATE_ADDED,
-            MediaStore.MediaColumns.DATE_MODIFIED
+            MediaStore.MediaColumns.DATE_ADDED
         )
         if (isVideo) {
+            projection += MediaStore.MediaColumns.DATE_MODIFIED
             projection += MediaStore.Video.VideoColumns.WIDTH
             projection += MediaStore.Video.VideoColumns.HEIGHT
         }
@@ -159,8 +159,11 @@ object MediaLibrary {
                         cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.SIZE)
                     val durationIndex =
                         cursor.getColumnIndexOrThrow(durationColumn)
-                    val dateModifiedIndex =
+                    val dateModifiedIndex = if (isVideo) {
                         cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DATE_MODIFIED)
+                    } else {
+                        -1
+                    }
                     val widthIndex = if (isVideo) {
                         cursor.getColumnIndexOrThrow(MediaStore.Video.VideoColumns.WIDTH)
                     } else {
@@ -178,7 +181,7 @@ object MediaLibrary {
                         val name = cursor.getString(nameIndex) ?: "Unknown"
                         val size = cursor.getLong(sizeIndex)
                         val duration = cursor.getLong(durationIndex)
-                        val dateModified = cursor.getLong(dateModifiedIndex)
+                        val dateModified = if (isVideo) cursor.getLong(dateModifiedIndex) else 0L
                         val width = if (isVideo) cursor.getInt(widthIndex) else 0
                         val height = if (isVideo) cursor.getInt(heightIndex) else 0
                         val storedPath = cursor.getString(folderIndex).orEmpty().trimEnd('/')
