@@ -2,7 +2,6 @@
 package com.mint.play
 
 import android.graphics.Bitmap
-import android.media.MediaMetadataRetriever
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -36,32 +35,10 @@ fun VideoThumbnail(
 
     val bitmap by produceState<Bitmap?>(
         initialValue = null,
-        key1 = item.uri,
-        key2 = item.duration
+        key1 = "${item.uri}|${item.duration}|${item.size}|${item.dateModified}"
     ) {
         value = withContext(Dispatchers.IO) {
-            val retriever = MediaMetadataRetriever()
-
-            try {
-                retriever.setDataSource(context, item.uri)
-
-                // Duration is in milliseconds; MediaMetadataRetriever uses microseconds.
-                val frameTimeUs =
-                    item.duration.coerceAtLeast(0L) * 100L
-
-                retriever.getFrameAtTime(
-                    frameTimeUs,
-                    MediaMetadataRetriever.OPTION_CLOSEST_SYNC
-                )
-            } catch (_: Exception) {
-                null
-            } finally {
-                try {
-                    retriever.release()
-                } catch (_: Exception) {
-                    // Ignore release failures.
-                }
-            }
+            ThumbnailCache.loadOrCreate(context, item)
         }
     }
 

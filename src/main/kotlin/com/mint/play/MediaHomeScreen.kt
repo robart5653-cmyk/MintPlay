@@ -153,7 +153,11 @@ fun MediaHomeScreen(
                 try {
                     mediaItems = withContext(Dispatchers.IO) {
                         if (isVideo) {
-                            MediaLibrary.getVideos(context)
+                            val scan = MediaLibrary.getVideoScan(context)
+                            if (scan.complete) {
+                                ThumbnailCache.cleanupIfLibraryChanged(context, scan.items)
+                            }
+                            scan.items
                         } else {
                             MediaLibrary.getAudio(context)
                         }
