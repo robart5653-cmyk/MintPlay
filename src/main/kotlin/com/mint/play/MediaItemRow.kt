@@ -38,6 +38,7 @@ fun MediaItemRow(
     onRename: (String) -> Unit = {},
     onShowDetails: () -> Unit = {},
     onPlayVideo: () -> Unit = {},
+    onPlayAudio: () -> Unit = {},
     isFavourite: Boolean = false,
     onRemoveFromPlaylist: (() -> Unit)? = null
 ) {
@@ -83,7 +84,8 @@ fun MediaItemRow(
                     .width(72.dp)
                     .aspectRatio(1f)
                     .clip(RoundedCornerShape(8.dp))
-                    .background(Background),
+                    .background(Background)
+                    .clickable { onPlayAudio() },
                 contentAlignment = Alignment.Center
             ) {
                 Text(
@@ -101,7 +103,7 @@ fun MediaItemRow(
                     if (isVideo) {
                         Modifier.clickable { onPlayVideo() }
                     } else {
-                        Modifier
+                        Modifier.clickable { onPlayAudio() }
                     }
                 ),
             verticalArrangement = Arrangement.spacedBy(if (isVideo) 3.dp else 0.dp)

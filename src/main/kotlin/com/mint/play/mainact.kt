@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -21,7 +22,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
+import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
 
@@ -73,7 +76,21 @@ fun MyScreen(
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
     var playerOpen by remember { mutableStateOf(false) }
+    var showAudioPlayer by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val audioPlayerController = remember(context) { AudioPlayerController(context) }
     val configuration = LocalConfiguration.current
+
+    DisposableEffect(audioPlayerController) {
+        onDispose { audioPlayerController.release() }
+    }
+
+    LaunchedEffect(audioPlayerController) {
+        while (true) {
+            if (audioPlayerController.hasPlayer) audioPlayerController.refreshProgress()
+            delay(250L)
+        }
+    }
     val immersiveLandscape = playerOpen &&
         configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
@@ -105,7 +122,28 @@ fun MyScreen(
                 audioGranted = audioGranted,
                 videoGranted = videoGranted,
                 onRequestPermissions = onRequestPermissions,
-                onVideoPlayerVisibilityChanged = { playerOpen = it }
+                onVideoPlayerVisibilityChanged = { playerOpen = it },
+                audioPlayerController = audioPlayerController,
+                showAudioPlayer = showAudioPlayer,
+                onAudioPlayerVisibilityChanged = { showAudioPlayer = it },
+                onAudioSelected = { queue, index ->
+                    audioPlayerController.playQueue(queue, index)
+                    showAudioPlayer = true
+                }
+            )
+        }
+
+        if (
+            !playerOpen &&
+            audioPlayerController.currentSong != null &&
+            (!showAudioPlayer || selectedTab != 1)
+        ) {
+            AudioMiniPlayer(
+                controller = audioPlayerController,
+                onOpen = {
+                    selectedTab = 1
+                    showAudioPlayer = true
+                }
             )
         }
 

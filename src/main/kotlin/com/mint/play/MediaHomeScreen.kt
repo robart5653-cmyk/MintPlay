@@ -47,7 +47,11 @@ fun MediaHomeScreen(
     isVideo: Boolean,
     permissionGranted: Boolean,
     onRequestPermissions: () -> Unit,
-    onVideoPlayerVisibilityChanged: (Boolean) -> Unit = {}
+    onVideoPlayerVisibilityChanged: (Boolean) -> Unit = {},
+    audioPlayerController: AudioPlayerController,
+    showAudioPlayer: Boolean,
+    onAudioPlayerVisibilityChanged: (Boolean) -> Unit,
+    onAudioSelected: (List<MediaItem>, Int) -> Unit
 ) {
     val context = LocalContext.current
     val historyPreferences = remember(context) {
@@ -242,6 +246,11 @@ fun MediaHomeScreen(
         closeVideo()
     }
 )
+    } else if (!isVideo && showAudioPlayer && audioPlayerController.currentSong != null) {
+        AudioPlayerScreen(
+            controller = audioPlayerController,
+            onBack = { onAudioPlayerVisibilityChanged(false) }
+        )
     } else if (isVideo && showFullHistory) {
         Column(
             modifier = Modifier
@@ -546,6 +555,19 @@ fun MediaHomeScreen(
                                 onPlayVideo = {
                                     if (isVideo) {
                                         openVideo(item)
+                                    }
+                                },
+                                onPlayAudio = {
+                                    if (!isVideo) {
+                                        val audioQueue = filteredVisibleItems.filter {
+                                            it.uri.toString().isNotBlank()
+                                        }
+                                        val audioIndex = audioQueue.indexOfFirst {
+                                            it.uri == item.uri
+                                        }
+                                        if (audioIndex >= 0) {
+                                            onAudioSelected(audioQueue, audioIndex)
+                                        }
                                     }
                                 },
                                 onFavourite = {
