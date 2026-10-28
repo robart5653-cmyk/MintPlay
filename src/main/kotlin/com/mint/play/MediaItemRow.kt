@@ -68,8 +68,10 @@ fun MediaItemRow(
             VideoThumbnail(
                 item = item,
                 modifier = Modifier
-                    .width(132.dp)
-                    .height(90.dp)
+                    // VIDEO THUMBNAIL WIDTH: change 160.dp below to make it wider or narrower.
+                    .width(160.dp)
+                    // VIDEO THUMBNAIL HEIGHT: change 100.dp below to make it taller or shorter.
+                    .height(100.dp)
                     .clip(RoundedCornerShape(8.dp))
                     .clickable { onPlayVideo() }
             )
