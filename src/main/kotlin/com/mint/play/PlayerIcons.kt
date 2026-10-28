@@ -194,3 +194,56 @@ internal fun LandscapeModeIcon(
         drawLine(color = color, start = Offset(size.width - x, size.height - y - dy), end = Offset(size.width - x, size.height - y), strokeWidth = stroke, cap = StrokeCap.Round)
     }
 }
+
+@Composable
+internal fun RotationModeIcon(
+    modifier: Modifier = Modifier,
+    rotationDegrees: Int,
+    color: Color
+) {
+    Canvas(modifier = modifier) {
+        val stroke = 2.dp.toPx()
+        val portrait = rotationDegrees == 0
+        val screenWidth = size.width * (if (portrait) 0.34f else 0.54f)
+        val screenHeight = size.height * (if (portrait) 0.54f else 0.34f)
+        val screenLeft = (size.width - screenWidth) / 2f
+        val screenTop = (size.height - screenHeight) / 2f
+
+        drawRoundRect(
+            color = color,
+            topLeft = Offset(screenLeft, screenTop),
+            size = Size(screenWidth, screenHeight),
+            cornerRadius = CornerRadius(size.width * 0.035f),
+            style = Stroke(width = stroke)
+        )
+
+        // A curved arrow shows that this button changes the video rotation.
+        val arrowSweep = if (rotationDegrees == -90) -245f else 245f
+        drawArc(
+            color = color,
+            startAngle = if (rotationDegrees == -90) 35f else 215f,
+            sweepAngle = arrowSweep,
+            useCenter = false,
+            topLeft = Offset(size.width * 0.10f, size.height * 0.10f),
+            size = Size(size.width * 0.80f, size.height * 0.80f),
+            style = Stroke(width = stroke, cap = StrokeCap.Round)
+        )
+
+        val arrowHead = Path().apply {
+            if (rotationDegrees == -90) {
+                moveTo(size.width * 0.20f, size.height * 0.30f)
+                lineTo(size.width * 0.34f, size.height * 0.29f)
+                lineTo(size.width * 0.27f, size.height * 0.42f)
+            } else {
+                moveTo(size.width * 0.80f, size.height * 0.70f)
+                lineTo(size.width * 0.66f, size.height * 0.71f)
+                lineTo(size.width * 0.73f, size.height * 0.58f)
+            }
+        }
+        drawPath(
+            path = arrowHead,
+            color = color,
+            style = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round)
+        )
+    }
+}
