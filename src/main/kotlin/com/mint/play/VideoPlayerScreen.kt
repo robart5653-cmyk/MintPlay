@@ -2,7 +2,10 @@
 package com.mint.play
 
 import android.app.Activity
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.ContextWrapper
 import android.content.res.Configuration
 import android.content.pm.ActivityInfo
@@ -224,6 +227,54 @@ fun VideoPlayerScreen(
                 window.attributes = attributes
             }
             controller.release()
+        }
+    }
+
+    // Video-only lock handling: pause on screen-off and resume after the user unlocks.
+    DisposableEffect(context, controller) {
+        var resumeAfterUnlock = false
+
+        val screenReceiver = object : BroadcastReceiver() {
+            override fun onReceive(receiverContext: Context?, intent: Intent?) {
+                when (intent?.action) {
+                    Intent.ACTION_SCREEN_OFF -> {
+                        val player = controller.player
+                        if (!resumeAfterUnlock && player.isPlaying) {
+                            resumeAfterUnlock = true
+                            saveCurrentPlaybackPosition()
+                            player.pause()
+                        }
+                    }
+
+                    Intent.ACTION_USER_PRESENT -> {
+                        if (resumeAfterUnlock) {
+                            // Give Android a moment to restore the app window. If the
+                            // user unlocked straight to the launcher, do not resume video
+                            // audio while MintPlay is still in the background.
+                            activity?.window?.decorView?.postDelayed({
+                                if (resumeAfterUnlock) {
+                                    resumeAfterUnlock = false
+                                    if (activity?.hasWindowFocus() == true) {
+                                        controller.player.play()
+                                    }
+                                }
+                            }, 400L) ?: run {
+                                resumeAfterUnlock = false
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        val screenFilter = IntentFilter().apply {
+            addAction(Intent.ACTION_SCREEN_OFF)
+            addAction(Intent.ACTION_USER_PRESENT)
+        }
+        context.registerReceiver(screenReceiver, screenFilter)
+
+        onDispose {
+            context.unregisterReceiver(screenReceiver)
         }
     }
 
