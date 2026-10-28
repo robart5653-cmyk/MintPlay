@@ -127,11 +127,6 @@ fun VideoPlayerScreen(
     var rotationLockState by remember {
         mutableIntStateOf(0)
     }
-    val videoRotationDegrees = when (rotationLockState) {
-        1 -> 90
-        2 -> -90
-        else -> 0
-    }
     val orientationLocked = rotationLockState != 0
 
     var scrubPosition by remember {
@@ -341,11 +336,11 @@ fun VideoPlayerScreen(
         when (rotationLockState) {
             0 -> {
                 rotationLockState = 1
-                activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LOCKED
+                activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
             }
             1 -> {
                 rotationLockState = 2
-                activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LOCKED
+                activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE
             }
             else -> {
                 rotationLockState = 0
@@ -420,7 +415,6 @@ fun VideoPlayerScreen(
         LandscapePlayerLayout(
             player = controller.player,
             isLandscape = true,
-            rotationDegrees = videoRotationDegrees,
             onToggleLandscape = toggleLandscape,
             headphoneModeEnabled = headphoneModeEnabled,
             onToggleHeadphoneMode = toggleHeadphoneMode,
@@ -531,7 +525,6 @@ fun VideoPlayerScreen(
             onGestureFeedback = onGestureFeedback,
             onSeekGesture = onSeekGesture,
             isLandscape = false,
-            rotationDegrees = videoRotationDegrees,
             headphoneModeEnabled = headphoneModeEnabled,
             onToggleHeadphoneMode = toggleHeadphoneMode,
             orientationLocked = orientationLocked,

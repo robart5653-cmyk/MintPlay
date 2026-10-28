@@ -11,12 +11,10 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -94,7 +92,6 @@ internal fun PlayerVideoArea(
     onGestureFeedback: (PlayerGestureType, Int) -> Unit,
     onSeekGesture: (Boolean, Int) -> Unit,
     isLandscape: Boolean,
-    rotationDegrees: Int,
     headphoneModeEnabled: Boolean,
     onToggleHeadphoneMode: () -> Unit,
     orientationLocked: Boolean,
@@ -109,7 +106,7 @@ internal fun PlayerVideoArea(
         context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     }
 
-    BoxWithConstraints(
+    Box(
         modifier = modifier
             .fillMaxSize()
             .background(Color.Black)
@@ -176,16 +173,9 @@ internal fun PlayerVideoArea(
                             }
                         }
                     )
-                }
-                // The layout dimensions swap before rotating so the rotated video still
-                // fills the available area instead of being clipped by its old bounds.
-                .then(
-                    if (rotationDegrees == 0) Modifier
-                    else Modifier.requiredSize(width = maxHeight, height = maxWidth)
-                ),
+                },
             factory = { context ->
                 PlayerView(context).apply {
-                    rotation = rotationDegrees.toFloat()
                     useController = false
                     useArtwork = false
                     resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
@@ -195,7 +185,6 @@ internal fun PlayerVideoArea(
             },
             update = { view ->
                 view.player = player
-                view.rotation = rotationDegrees.toFloat()
             }
         )
 
@@ -343,7 +332,7 @@ internal fun PlayerVideoArea(
                         // CHANGE ICON SIZE HERE: replace 24.dp with your preferred size.
                         RotationModeIcon(
                             modifier = Modifier.size(24.dp),
-                            rotationDegrees = rotationDegrees,
+                            isLandscape = isLandscape,
                             color = if (orientationLocked) {
                                 PlayerMint
                             } else {
