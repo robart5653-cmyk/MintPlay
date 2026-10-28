@@ -13,7 +13,10 @@ data class MediaItem(
     val name: String,
     val uri: Uri,
     val duration: Long,
-    val size: Long
+    val size: Long,
+    val width: Int = 0,
+    val height: Int = 0,
+    val folderName: String = ""
 )
 
 object MediaLibrary {
@@ -102,18 +105,28 @@ object MediaLibrary {
             MediaStore.Audio.AudioColumns.DURATION
         }
 
-        val projection = arrayOf(
+        val folderColumn = if (Build.VERSION.SDK_INT >= 29) {
+            MediaStore.MediaColumns.RELATIVE_PATH
+        } else {
+            MediaStore.MediaColumns.DATA
+        }
+        val projection = mutableListOf(
             MediaStore.MediaColumns._ID,
             MediaStore.MediaColumns.DISPLAY_NAME,
             MediaStore.MediaColumns.SIZE,
             durationColumn,
             MediaStore.MediaColumns.DATE_ADDED
         )
+        if (isVideo) {
+            projection += MediaStore.Video.VideoColumns.WIDTH
+            projection += MediaStore.Video.VideoColumns.HEIGHT
+        }
+        projection += folderColumn
 
         try {
             context.contentResolver.query(
                 collection,
-                projection,
+                projection.toTypedArray(),
                 null,
                 null,
                 "${MediaStore.MediaColumns.DATE_ADDED} DESC"
@@ -126,12 +139,31 @@ object MediaLibrary {
                     cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.SIZE)
                 val durationIndex =
                     cursor.getColumnIndexOrThrow(durationColumn)
+                val widthIndex = if (isVideo) {
+                    cursor.getColumnIndexOrThrow(MediaStore.Video.VideoColumns.WIDTH)
+                } else {
+                    -1
+                }
+                val heightIndex = if (isVideo) {
+                    cursor.getColumnIndexOrThrow(MediaStore.Video.VideoColumns.HEIGHT)
+                } else {
+                    -1
+                }
+                val folderIndex = cursor.getColumnIndexOrThrow(folderColumn)
 
                 while (cursor.moveToNext()) {
                     val id = cursor.getLong(idIndex)
                     val name = cursor.getString(nameIndex) ?: "Unknown"
                     val size = cursor.getLong(sizeIndex)
                     val duration = cursor.getLong(durationIndex)
+                    val width = if (isVideo) cursor.getInt(widthIndex) else 0
+                    val height = if (isVideo) cursor.getInt(heightIndex) else 0
+                    val storedPath = cursor.getString(folderIndex).orEmpty().trimEnd('/')
+                    val folderName = if (Build.VERSION.SDK_INT >= 29) {
+                        storedPath.substringAfterLast('/')
+                    } else {
+                        storedPath.substringBeforeLast('/').substringAfterLast('/')
+                    }
 
                     val uri = ContentUris.withAppendedId(collection, id)
 
@@ -141,7 +173,10 @@ object MediaLibrary {
                             name = name,
                             uri = uri,
                             duration = duration,
-                            size = size
+                            size = size,
+                            width = width,
+                            height = height,
+                            folderName = folderName
                         )
                     )
                 }

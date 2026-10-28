@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -43,11 +44,22 @@ fun MediaItemRow(
     var showDelete by remember(item.uri) { mutableStateOf(false) }
     var showDetails by remember(item.uri) { mutableStateOf(false) }
 
+    val displayedFolderName = folderPath
+        .substringAfterLast('/')
+        .ifBlank { item.folderName }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(NavBackground)
+            .then(
+                if (isVideo) {
+                    Modifier
+                } else {
+                    Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(NavBackground)
+                }
+            )
             .padding(12.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.Top
@@ -57,7 +69,7 @@ fun MediaItemRow(
                 item = item,
                 modifier = Modifier
                     .width(132.dp)
-                    .aspectRatio(16f / 9f)
+                    .height(90.dp)
                     .clip(RoundedCornerShape(8.dp))
                     .clickable { onPlayVideo() }
             )
@@ -87,52 +99,97 @@ fun MediaItemRow(
                     } else {
                         Modifier
                     }
-                )
+                ),
+            verticalArrangement = Arrangement.spacedBy(if (isVideo) 3.dp else 0.dp)
         ) {
-            Row(verticalAlignment = Alignment.Top) {
+            if (isVideo) {
                 Text(
                     text = item.name,
                     color = PrimaryText,
                     fontWeight = FontWeight.Medium,
                     fontSize = 14.sp,
                     maxLines = 2,
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(top = 3.dp)
+                    modifier = Modifier.padding(top = 3.dp)
                 )
 
-                MediaItemMenu(
-                    onRename = { showRename = true },
-                    onDelete = { showDelete = true },
-                    onFavourite = onFavourite,
-                    onAddToPlaylist = onAddToPlaylist,
-                    onShowDetails = { showDetails = true },
-                    isFavourite = isFavourite,
-                    onRemoveFromPlaylist = onRemoveFromPlaylist
-                )
-            }
-
-            Text(
-                text = buildString {
-                    if (isVideo) {
-                        append(formatMediaDuration(item.duration))
-                        append("  •  ")
-                    }
-                    append(formatMediaSize(item.size))
-                },
-                color = SecondaryText,
-                fontSize = 12.sp,
-                modifier = Modifier.padding(top = 5.dp)
-            )
-
-            if (folderPath.isNotBlank()) {
+                val qualityHeight = when {
+                    item.width > 0 && item.height > 0 -> minOf(item.width, item.height)
+                    item.width > 0 -> item.width
+                    item.height > 0 -> item.height
+                    else -> 0
+                }
+                val quality = if (qualityHeight > 0) "${qualityHeight}p" else ""
                 Text(
-                    text = folderPath,
+                    text = listOf(quality, formatMediaSize(item.size))
+                        .filter { it.isNotBlank() }
+                        .joinToString("  •  "),
+                    color = SecondaryText,
+                    fontSize = 12.sp
+                )
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (displayedFolderName.isNotBlank()) {
+                        Text(
+                            text = displayedFolderName,
+                            color = SecondaryText,
+                            fontSize = 12.sp,
+                            maxLines = 1,
+                            modifier = Modifier.weight(1f)
+                        )
+                    } else {
+                        Box(modifier = Modifier.weight(1f))
+                    }
+
+                    MediaItemMenu(
+                        onRename = { showRename = true },
+                        onDelete = { showDelete = true },
+                        onFavourite = onFavourite,
+                        onAddToPlaylist = onAddToPlaylist,
+                        onShowDetails = { showDetails = true },
+                        isFavourite = isFavourite,
+                        onRemoveFromPlaylist = onRemoveFromPlaylist
+                    )
+                }
+            } else {
+                Row(verticalAlignment = Alignment.Top) {
+                    Text(
+                        text = item.name,
+                        color = PrimaryText,
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 14.sp,
+                        maxLines = 2,
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(top = 3.dp)
+                    )
+
+                    MediaItemMenu(
+                        onRename = { showRename = true },
+                        onDelete = { showDelete = true },
+                        onFavourite = onFavourite,
+                        onAddToPlaylist = onAddToPlaylist,
+                        onShowDetails = { showDetails = true },
+                        isFavourite = isFavourite,
+                        onRemoveFromPlaylist = onRemoveFromPlaylist
+                    )
+                }
+
+                Text(
+                    text = formatMediaSize(item.size),
                     color = SecondaryText,
                     fontSize = 12.sp,
-                    maxLines = 2,
                     modifier = Modifier.padding(top = 5.dp)
                 )
+
+                if (folderPath.isNotBlank()) {
+                    Text(
+                        text = folderPath,
+                        color = SecondaryText,
+                        fontSize = 12.sp,
+                        maxLines = 2,
+                        modifier = Modifier.padding(top = 5.dp)
+                    )
+                }
             }
         }
     }
