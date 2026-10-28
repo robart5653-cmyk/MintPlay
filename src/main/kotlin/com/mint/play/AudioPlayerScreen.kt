@@ -1,10 +1,8 @@
 package com.mint.play
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.Canvas
@@ -32,6 +30,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -123,7 +122,7 @@ fun AudioPlayerScreen(
             contentAlignment = Alignment.Center
         ) {
             val artworkSize = minOf(maxWidth * 0.82f, maxHeight * 0.94f, 320.dp)
-            MintPlayArtwork(modifier = Modifier.size(artworkSize))
+            MintPlayArtwork(isPlaying = controller.isPlaying, modifier = Modifier.size(artworkSize))
         }
 
         AudioSeekBar(controller)
@@ -243,20 +242,32 @@ fun AudioPlayerScreen(
 }
 
 @Composable
-private fun MintPlayArtwork(modifier: Modifier = Modifier) {
-    // Positive rotationZ turns clockwise in Compose's screen coordinate system.
-    val rotation by rememberInfiniteTransition(label = "MintPlayDisc")
-        .animateFloat(
-            initialValue = 0f,
-            targetValue = 360f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(durationMillis = 18_000, easing = LinearEasing)
-            ),
-            label = "MintPlayDiscRotation"
-        )
+private fun MintPlayArtwork(
+    isPlaying: Boolean,
+    modifier: Modifier = Modifier
+) {
+    // Keep the current angle when paused; resume smoothly when Play is pressed.
+    val rotation = remember { Animatable(0f) }
+    LaunchedEffect(isPlaying) {
+        if (isPlaying) {
+            while (isPlaying) {
+                val nextRotation = (rotation.value / 360f).toInt() * 360f + 360f
+                val degreesRemaining = nextRotation - rotation.value
+                val duration = (18_000f * degreesRemaining / 360f)
+                    .toInt()
+                    .coerceAtLeast(1)
+                rotation.animateTo(
+                    targetValue = nextRotation,
+                    animationSpec = tween(
+                        durationMillis = duration,
+                        easing = LinearEasing
+                    )
+                )
+            }
+        }
+    }
 
-    // The SVG was split into two transparent layers: only the disc rotates;
-    // the MintPlay wordmark stays aligned and completely still above it.
+    // The CD artwork rotates clockwise; the MintPlay wordmark remains still.
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
         Image(
             painter = painterResource(id = R.drawable.mintplay_disc),
@@ -264,7 +275,7 @@ private fun MintPlayArtwork(modifier: Modifier = Modifier) {
             contentScale = ContentScale.Fit,
             modifier = Modifier
                 .fillMaxSize()
-                .graphicsLayer { rotationZ = rotation }
+                .graphicsLayer { rotationZ = rotation.value }
         )
         Image(
             painter = painterResource(id = R.drawable.mintplay_wordmark),
