@@ -20,6 +20,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -72,6 +73,7 @@ fun MediaItemRow(
                     .width(160.dp)
                     // VIDEO THUMBNAIL HEIGHT: change 100.dp below to make it taller or shorter.
                     .height(100.dp)
+                    .offset(y = 8.dp)
                     .clip(RoundedCornerShape(8.dp))
                     .clickable { onPlayVideo() }
             )
