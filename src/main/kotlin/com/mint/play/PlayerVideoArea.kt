@@ -96,7 +96,6 @@ internal fun PlayerVideoArea(
     onToggleHeadphoneMode: () -> Unit,
     orientationLocked: Boolean,
     onToggleOrientationLock: () -> Unit,
-    onToggleLandscape: () -> Unit,
     showOverlayControls: Boolean = true,
     transparentControlBackground: Boolean = false,
     modifier: Modifier = Modifier
@@ -342,18 +341,6 @@ internal fun PlayerVideoArea(
                     }
                 }
 
-                Surface(
-                    modifier = Modifier.size(48.dp),
-                    shape = CircleShape,
-                    color = if (transparentControlBackground) Color.Transparent else Color.Black.copy(alpha = 0.45f)
-                ) {
-                    IconButton(onClick = onToggleLandscape) {
-                        LandscapeModeIcon(
-                            modifier = Modifier.size(24.dp),
-                            color = if (isLandscape) PlayerMint else Color.White
-                        )
-                    }
-                }
             }
         }
     }

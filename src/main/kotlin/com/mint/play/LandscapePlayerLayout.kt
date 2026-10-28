@@ -43,7 +43,6 @@ import kotlinx.coroutines.delay
 internal fun LandscapePlayerLayout(
     player: ExoPlayer,
     isLandscape: Boolean,
-    onToggleLandscape: () -> Unit,
     headphoneModeEnabled: Boolean,
     onToggleHeadphoneMode: () -> Unit,
     orientationLocked: Boolean,
@@ -111,7 +110,6 @@ internal fun LandscapePlayerLayout(
             onToggleHeadphoneMode = onToggleHeadphoneMode,
             orientationLocked = orientationLocked,
             onToggleOrientationLock = onToggleOrientationLock,
-            onToggleLandscape = onToggleLandscape,
             showOverlayControls = controlsVisible,
             transparentControlBackground = true,
             modifier = Modifier.fillMaxSize()

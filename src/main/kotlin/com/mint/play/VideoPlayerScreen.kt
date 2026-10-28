@@ -349,15 +349,6 @@ fun VideoPlayerScreen(
         }
     }
 
-    val toggleLandscape = {
-        rotationLockState = 0
-        activity?.requestedOrientation = if (isLandscape) {
-            ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-        } else {
-            ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-        }
-    }
-
     LaunchedEffect(controller, activeUri) {
         if (!resumePlaybackEnabled) {
             // Turning this setting off means videos always start at the beginning.
@@ -415,7 +406,6 @@ fun VideoPlayerScreen(
         LandscapePlayerLayout(
             player = controller.player,
             isLandscape = true,
-            onToggleLandscape = toggleLandscape,
             headphoneModeEnabled = headphoneModeEnabled,
             onToggleHeadphoneMode = toggleHeadphoneMode,
             orientationLocked = orientationLocked,
@@ -529,7 +519,6 @@ fun VideoPlayerScreen(
             onToggleHeadphoneMode = toggleHeadphoneMode,
             orientationLocked = orientationLocked,
             onToggleOrientationLock = toggleOrientationLock,
-            onToggleLandscape = toggleLandscape,
             showOverlayControls = portraitControlsVisible,
             modifier = Modifier
                 .fillMaxWidth()
