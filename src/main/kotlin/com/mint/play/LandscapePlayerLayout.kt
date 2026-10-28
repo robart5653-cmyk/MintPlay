@@ -254,19 +254,6 @@ internal fun LandscapePlayerLayout(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Surface(
-                            onClick = { /* Subtitle track selection is not connected yet. */ },
-                            shape = RoundedCornerShape(8.dp),
-                            color = Color.Transparent,
-                            contentColor = PlayerWhite,
-                            border = BorderStroke(1.dp, PlayerOutline)
-                        ) {
-                            Text(
-                                text = "CC",
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
-                                fontSize = 12.sp
-                            )
-                        }
-                        Surface(
                             onClick = onSpeedClick,
                             shape = RoundedCornerShape(8.dp),
                             color = Color.Transparent,

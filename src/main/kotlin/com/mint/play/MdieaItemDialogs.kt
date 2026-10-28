@@ -27,7 +27,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-private val DialogSurface = Color(0xFF1A1E25)
+private val DialogSurface = NavBackground
 private val DeleteColor = Color(0xFFFF7777)
 private val MintPlayGreen = Color(0xFF4DD4AC)
 

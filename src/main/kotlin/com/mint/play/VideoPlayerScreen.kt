@@ -733,33 +733,11 @@ fun VideoPlayerScreen(
                     }
                 }
 
-                // Original subtitle and playback-speed buttons
+                // Playback-speed control
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Surface(
-                        onClick = {
-                            // Subtitle selection can be connected to Media3 tracks.
-                        },
-                        shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
-                        color = PlayerBackground,
-                        contentColor = PlayerWhite,
-                        border = BorderStroke(
-                            1.dp,
-                            PlayerOutline
-                        )
-                    ) {
-                        Text(
-                            text = "CC",
-                            modifier = Modifier.padding(
-                                horizontal = 12.dp,
-                                vertical = 7.dp
-                            ),
-                            fontSize = 12.sp
-                        )
-                    }
-
                     Surface(
                         onClick = {
                             val nextSpeedIndex = (speedIndex + 1) % speeds.size

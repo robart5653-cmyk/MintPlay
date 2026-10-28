@@ -483,9 +483,7 @@ fun MediaHomeScreen(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
-                            text = "Allow access to your ${
-                                if (isVideo) "videos" else "audio"
-                            } to build your library.",
+                            text = "Allow MintPlay to access your files to build your library.",
                             color = SecondaryText
                         )
 
@@ -493,7 +491,7 @@ fun MediaHomeScreen(
                             onClick = onRequestPermissions,
                             modifier = Modifier.padding(top = 12.dp)
                         ) {
-                            Text("Grant access")
+                            Text("Grant storage access")
                         }
                     }
                 }

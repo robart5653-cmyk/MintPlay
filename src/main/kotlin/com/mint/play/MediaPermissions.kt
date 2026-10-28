@@ -9,81 +9,53 @@ import android.os.Environment
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.content.ContextCompat
 
 class MediaPermissions(
     private val activity: ComponentActivity,
-    private val onResult: (
-        audioGranted: Boolean,
-        videoGranted: Boolean
-    ) -> Unit
+    private val onResult: (audioGranted: Boolean, videoGranted: Boolean) -> Unit
 ) {
-    private val launcher =
+    private val legacyStorageLauncher =
         activity.registerForActivityResult(
-            ActivityResultContracts.RequestMultiplePermissions()
+            ActivityResultContracts.RequestPermission()
         ) {
-            onResult(hasAudioAccess(), hasVideoAccess())
-
-            // All-files access is granted through Android Settings,
-            // not through the runtime permission dialog.
-            requestAllFilesAccessIfNeeded()
+            val granted = hasAudioAccess()
+            onResult(granted, granted)
         }
 
     fun requestIfNeeded() {
-       val missing = if (Build.VERSION.SDK_INT >= 33) {
-            buildList {
-                if (!hasAudioAccess()) {
-                    add(Manifest.permission.READ_MEDIA_AUDIO)
-                }
-                if (!hasVideoAccess()) {
-                    add(Manifest.permission.READ_MEDIA_VIDEO)
-                }
-            }
-        } else {
-            if (!hasAudioAccess() || !hasVideoAccess()) {
-                listOf(Manifest.permission.READ_EXTERNAL_STORAGE)
-            } else {
-                emptyList()
-            }
-        }
-
-       if (missing.isNotEmpty()) {
-           launcher.launch(missing.toTypedArray())
-       } else {
-           onResult(hasAudioAccess(), hasVideoAccess())
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             requestAllFilesAccessIfNeeded()
+            val granted = hasAllFilesAccess()
+            if (granted) onResult(true, true)
+            return
         }
-    }
 
-    fun hasAudioAccess(): Boolean {
-        val permission = if (Build.VERSION.SDK_INT >= 33) {
-            Manifest.permission.READ_MEDIA_AUDIO
+        if (hasLegacyStorageAccess()) {
+            onResult(true, true)
         } else {
-            Manifest.permission.READ_EXTERNAL_STORAGE
+            legacyStorageLauncher.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
         }
-
-        return ContextCompat.checkSelfPermission(
-            activity,
-            permission
-        ) == PackageManager.PERMISSION_GRANTED
     }
 
-    fun hasVideoAccess(): Boolean {
-        val permission = if (Build.VERSION.SDK_INT >= 33) {
-            Manifest.permission.READ_MEDIA_VIDEO
-        } else {
-            Manifest.permission.READ_EXTERNAL_STORAGE
-        }
+    fun hasAudioAccess(): Boolean = hasStorageAccess()
 
-        return ContextCompat.checkSelfPermission(
-            activity,
-            permission
-        ) == PackageManager.PERMISSION_GRANTED
-    }
+    fun hasVideoAccess(): Boolean = hasStorageAccess()
 
-    fun hasAllFilesAccess(): Boolean {
-        return Build.VERSION.SDK_INT < Build.VERSION_CODES.R ||
+    fun hasAllFilesAccess(): Boolean =
+        Build.VERSION.SDK_INT < Build.VERSION_CODES.R ||
             Environment.isExternalStorageManager()
+
+    private fun hasStorageAccess(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            Environment.isExternalStorageManager()
+        } else {
+            hasLegacyStorageAccess()
+        }
+    }
+
+    private fun hasLegacyStorageAccess(): Boolean {
+        return activity.checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) ==
+            PackageManager.PERMISSION_GRANTED
     }
 
     private fun requestAllFilesAccessIfNeeded() {

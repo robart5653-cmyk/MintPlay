@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.os.Environment
 import android.provider.MediaStore
 
 data class MediaItem(
@@ -22,26 +23,17 @@ data class MediaItem(
 
 object MediaLibrary {
 
-    fun hasVideoPermission(context: Context): Boolean {
-        val permission = if (Build.VERSION.SDK_INT >= 33) {
-            Manifest.permission.READ_MEDIA_VIDEO
+    fun hasVideoPermission(context: Context): Boolean = hasStorageAccess(context)
+
+    fun hasAudioPermission(context: Context): Boolean = hasStorageAccess(context)
+
+    private fun hasStorageAccess(context: Context): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            Environment.isExternalStorageManager()
         } else {
-            Manifest.permission.READ_EXTERNAL_STORAGE
+            context.checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) ==
+                PackageManager.PERMISSION_GRANTED
         }
-
-        return context.checkSelfPermission(permission) ==
-            PackageManager.PERMISSION_GRANTED
-    }
-
-    fun hasAudioPermission(context: Context): Boolean {
-        val permission = if (Build.VERSION.SDK_INT >= 33) {
-            Manifest.permission.READ_MEDIA_AUDIO
-        } else {
-            Manifest.permission.READ_EXTERNAL_STORAGE
-        }
-
-        return context.checkSelfPermission(permission) ==
-            PackageManager.PERMISSION_GRANTED
     }
 
     fun getVideos(context: Context): List<MediaItem> = getVideoScan(context).items

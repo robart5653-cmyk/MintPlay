@@ -10,7 +10,6 @@ object VideoSettingsStore {
     private const val KEY_DOUBLE_TAP_SEEK = "double_tap_seek_seconds"
     private const val KEY_DEFAULT_ORIENTATION = "default_orientation"
     private const val KEY_RESUME_PLAYBACK = "resume_playback"
-    private const val KEY_SUBTITLES = "subtitles_preference"
 
     private fun preferences(context: Context): SharedPreferences {
         return context.applicationContext.getSharedPreferences(
@@ -86,20 +85,5 @@ object VideoSettingsStore {
             .forEach { editor.remove(it) }
 
         editor.apply()
-    }
-
-    fun getSubtitlesPreference(context: Context): String {
-        return preferences(context).getString(
-            KEY_SUBTITLES,
-            "Auto"
-        ) ?: "Auto"
-    }
-
-    fun setSubtitlesPreference(context: Context, preference: String) {
-        if (preference in setOf("Auto", "On", "Off")) {
-            preferences(context).edit()
-                .putString(KEY_SUBTITLES, preference)
-                .apply()
-        }
     }
 }
