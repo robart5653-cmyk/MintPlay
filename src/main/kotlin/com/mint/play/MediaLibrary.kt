@@ -16,7 +16,8 @@ data class MediaItem(
     val size: Long,
     val width: Int = 0,
     val height: Int = 0,
-    val folderName: String = ""
+    val folderName: String = "",
+    val dateModified: Long = 0L
 )
 
 object MediaLibrary {
@@ -43,22 +44,25 @@ object MediaLibrary {
             PackageManager.PERMISSION_GRANTED
     }
 
-    fun getVideos(context: Context): List<MediaItem> {
-        if (!hasVideoPermission(context)) return emptyList()
+    fun getVideos(context: Context): List<MediaItem> = getVideoScan(context).items
 
+    fun getVideoScan(context: Context): MediaLibraryScan {
+        if (!hasVideoPermission(context)) {
+            return MediaLibraryScan(emptyList(), complete = false)
+        }
         return queryAllVolumes(context, isVideo = true)
     }
 
     fun getAudio(context: Context): List<MediaItem> {
         if (!hasAudioPermission(context)) return emptyList()
 
-        return queryAllVolumes(context, isVideo = false)
+        return queryAllVolumes(context, isVideo = false).items
     }
 
     private fun queryAllVolumes(
         context: Context,
         isVideo: Boolean
-    ): List<MediaItem> {
+    ): MediaLibraryScan {
         val collections = if (Build.VERSION.SDK_INT >= 29) {
             MediaStore.getExternalVolumeNames(context).map { volume ->
                 if (isVideo) {
@@ -78,26 +82,38 @@ object MediaLibrary {
         }
 
         val results = linkedMapOf<String, MediaItem>()
+        var complete = collections.isNotEmpty()
 
         for (collection in collections) {
-            queryCollection(
+            val scan = queryCollection(
                 context = context,
                 collection = collection,
                 isVideo = isVideo
-            ).forEach { item ->
+            )
+            if (!scan.complete) complete = false
+            scan.items.forEach { item ->
                 results[item.uri.toString()] = item
             }
         }
 
-        return results.values.sortedByDescending { it.id }
+        return MediaLibraryScan(
+            items = results.values.sortedByDescending { it.id },
+            complete = complete
+        )
     }
+
+    private data class CollectionScan(
+        val items: List<MediaItem>,
+        val complete: Boolean
+    )
 
     private fun queryCollection(
         context: Context,
         collection: Uri,
         isVideo: Boolean
-    ): List<MediaItem> {
+    ): CollectionScan {
         val results = mutableListOf<MediaItem>()
+        var complete = false
 
         val durationColumn = if (isVideo) {
             MediaStore.Video.VideoColumns.DURATION
@@ -115,7 +131,8 @@ object MediaLibrary {
             MediaStore.MediaColumns.DISPLAY_NAME,
             MediaStore.MediaColumns.SIZE,
             durationColumn,
-            MediaStore.MediaColumns.DATE_ADDED
+            MediaStore.MediaColumns.DATE_ADDED,
+            MediaStore.MediaColumns.DATE_MODIFIED
         )
         if (isVideo) {
             projection += MediaStore.Video.VideoColumns.WIDTH
@@ -124,69 +141,84 @@ object MediaLibrary {
         projection += folderColumn
 
         try {
-            context.contentResolver.query(
+            val cursor = context.contentResolver.query(
                 collection,
                 projection.toTypedArray(),
                 null,
                 null,
                 "${MediaStore.MediaColumns.DATE_ADDED} DESC"
-            )?.use { cursor ->
-                val idIndex =
-                    cursor.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)
-                val nameIndex =
-                    cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME)
-                val sizeIndex =
-                    cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.SIZE)
-                val durationIndex =
-                    cursor.getColumnIndexOrThrow(durationColumn)
-                val widthIndex = if (isVideo) {
-                    cursor.getColumnIndexOrThrow(MediaStore.Video.VideoColumns.WIDTH)
-                } else {
-                    -1
-                }
-                val heightIndex = if (isVideo) {
-                    cursor.getColumnIndexOrThrow(MediaStore.Video.VideoColumns.HEIGHT)
-                } else {
-                    -1
-                }
-                val folderIndex = cursor.getColumnIndexOrThrow(folderColumn)
-
-                while (cursor.moveToNext()) {
-                    val id = cursor.getLong(idIndex)
-                    val name = cursor.getString(nameIndex) ?: "Unknown"
-                    val size = cursor.getLong(sizeIndex)
-                    val duration = cursor.getLong(durationIndex)
-                    val width = if (isVideo) cursor.getInt(widthIndex) else 0
-                    val height = if (isVideo) cursor.getInt(heightIndex) else 0
-                    val storedPath = cursor.getString(folderIndex).orEmpty().trimEnd('/')
-                    val folderName = if (Build.VERSION.SDK_INT >= 29) {
-                        storedPath.substringAfterLast('/')
+            )
+            if (cursor != null) {
+                complete = true
+                cursor.use { cursor ->
+                    val idIndex =
+                        cursor.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)
+                    val nameIndex =
+                        cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME)
+                    val sizeIndex =
+                        cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.SIZE)
+                    val durationIndex =
+                        cursor.getColumnIndexOrThrow(durationColumn)
+                    val dateModifiedIndex =
+                        cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DATE_MODIFIED)
+                    val widthIndex = if (isVideo) {
+                        cursor.getColumnIndexOrThrow(MediaStore.Video.VideoColumns.WIDTH)
                     } else {
-                        storedPath.substringBeforeLast('/').substringAfterLast('/')
+                        -1
                     }
+                    val heightIndex = if (isVideo) {
+                        cursor.getColumnIndexOrThrow(MediaStore.Video.VideoColumns.HEIGHT)
+                    } else {
+                        -1
+                    }
+                    val folderIndex = cursor.getColumnIndexOrThrow(folderColumn)
 
-                    val uri = ContentUris.withAppendedId(collection, id)
+                    while (cursor.moveToNext()) {
+                        val id = cursor.getLong(idIndex)
+                        val name = cursor.getString(nameIndex) ?: "Unknown"
+                        val size = cursor.getLong(sizeIndex)
+                        val duration = cursor.getLong(durationIndex)
+                        val dateModified = cursor.getLong(dateModifiedIndex)
+                        val width = if (isVideo) cursor.getInt(widthIndex) else 0
+                        val height = if (isVideo) cursor.getInt(heightIndex) else 0
+                        val storedPath = cursor.getString(folderIndex).orEmpty().trimEnd('/')
+                        val folderName = if (Build.VERSION.SDK_INT >= 29) {
+                            storedPath.substringAfterLast('/')
+                        } else {
+                            storedPath.substringBeforeLast('/').substringAfterLast('/')
+                        }
 
-                    results.add(
-                        MediaItem(
-                            id = id,
-                            name = name,
-                            uri = uri,
-                            duration = duration,
-                            size = size,
-                            width = width,
-                            height = height,
-                            folderName = folderName
+                        val uri = ContentUris.withAppendedId(collection, id)
+
+                        results.add(
+                            MediaItem(
+                                id = id,
+                                name = name,
+                                uri = uri,
+                                duration = duration,
+                                size = size,
+                                width = width,
+                                height = height,
+                                folderName = folderName,
+                                dateModified = dateModified
+                            )
                         )
-                    )
+                    }
                 }
             }
         } catch (_: SecurityException) {
+            complete = false
             // A volume may not be accessible with the current permissions.
         } catch (_: IllegalArgumentException) {
             // Skip a volume whose provider doesn't support this query.
+            complete = false
         }
 
-        return results
+        return CollectionScan(results, complete)
     }
 }
+
+data class MediaLibraryScan(
+    val items: List<MediaItem>,
+    val complete: Boolean
+)
