@@ -2,6 +2,7 @@ package com.mint.play
 
 import android.content.Context
 import android.net.Uri
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
@@ -28,6 +29,13 @@ class VideoPlayerController(context: Context) {
         player.setMediaItem(MediaItem.fromUri(uri))
         player.prepare()
         player.playWhenReady = true
+    }
+
+    fun setAudioOnlyMode(enabled: Boolean) {
+        player.trackSelectionParameters = player.trackSelectionParameters
+            .buildUpon()
+            .setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, enabled)
+            .build()
     }
 
     fun togglePlayPause() {

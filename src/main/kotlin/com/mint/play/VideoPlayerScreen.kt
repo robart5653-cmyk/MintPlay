@@ -117,6 +117,12 @@ fun VideoPlayerScreen(
         mutableStateOf(false)
     }
 
+    val toggleHeadphoneMode = {
+        val enabled = !headphoneModeEnabled
+        controller.setAudioOnlyMode(enabled)
+        headphoneModeEnabled = enabled
+    }
+
     var orientationLocked by remember {
         mutableStateOf(false)
     }
@@ -231,7 +237,7 @@ fun VideoPlayerScreen(
     }
 
     // Video-only lock handling: pause on screen-off and resume after the user unlocks.
-    DisposableEffect(context, controller) {
+    DisposableEffect(context, controller, headphoneModeEnabled) {
         var resumeAfterUnlock = false
 
         val screenReceiver = object : BroadcastReceiver() {
@@ -239,7 +245,7 @@ fun VideoPlayerScreen(
                 when (intent?.action) {
                     Intent.ACTION_SCREEN_OFF -> {
                         val player = controller.player
-                        if (!resumeAfterUnlock && player.isPlaying) {
+                        if (!headphoneModeEnabled && !resumeAfterUnlock && player.isPlaying) {
                             resumeAfterUnlock = true
                             saveCurrentPlaybackPosition()
                             player.pause()
@@ -402,7 +408,7 @@ fun VideoPlayerScreen(
             isLandscape = true,
             onToggleLandscape = toggleLandscape,
             headphoneModeEnabled = headphoneModeEnabled,
-            onToggleHeadphoneMode = { headphoneModeEnabled = !headphoneModeEnabled },
+            onToggleHeadphoneMode = toggleHeadphoneMode,
             orientationLocked = orientationLocked,
             onToggleOrientationLock = toggleOrientationLock,
             activeTitle = activeTitle,
@@ -511,7 +517,7 @@ fun VideoPlayerScreen(
             onSeekGesture = onSeekGesture,
             isLandscape = false,
             headphoneModeEnabled = headphoneModeEnabled,
-            onToggleHeadphoneMode = { headphoneModeEnabled = !headphoneModeEnabled },
+            onToggleHeadphoneMode = toggleHeadphoneMode,
             orientationLocked = orientationLocked,
             onToggleOrientationLock = toggleOrientationLock,
             onToggleLandscape = toggleLandscape,

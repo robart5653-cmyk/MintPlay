@@ -177,7 +177,9 @@ internal fun PlayerVideoArea(
             factory = { context ->
                 PlayerView(context).apply {
                     useController = false
+                    useArtwork = false
                     resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+                    setShutterBackgroundColor(android.graphics.Color.BLACK)
                     this.player = player
                 }
             },
@@ -185,6 +187,20 @@ internal fun PlayerVideoArea(
                 view.player = player
             }
         )
+
+        if (headphoneModeEnabled) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "Background play enabled",
+                    color = PlayerMint,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        }
 
         if (gestureFeedback != null) {
             Surface(
