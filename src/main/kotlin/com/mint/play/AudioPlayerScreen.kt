@@ -270,7 +270,7 @@ private fun MintPlayArtwork(
     // The CD artwork rotates clockwise; the MintPlay wordmark remains still.
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
         Image(
-            painter = painterResource(id = R.drawable.mintplay_disc),
+            painter = painterResource(id = R.drawable.mint_play_cd_no_text),
             contentDescription = null,
             contentScale = ContentScale.Fit,
             modifier = Modifier
@@ -278,7 +278,7 @@ private fun MintPlayArtwork(
                 .graphicsLayer { rotationZ = rotation.value }
         )
         Image(
-            painter = painterResource(id = R.drawable.mintplay_wordmark),
+            painter = painterResource(id = R.drawable.mint_play_text_layer),
             contentDescription = "MintPlay",
             contentScale = ContentScale.Fit,
             modifier = Modifier.fillMaxSize()
