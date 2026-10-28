@@ -123,9 +123,16 @@ fun VideoPlayerScreen(
         headphoneModeEnabled = enabled
     }
 
-    var orientationLocked by remember {
-        mutableStateOf(false)
+    // The button cycles through clockwise, counterclockwise, then portrait.
+    var rotationLockState by remember {
+        mutableIntStateOf(0)
     }
+    val videoRotationDegrees = when (rotationLockState) {
+        1 -> 90
+        2 -> -90
+        else -> 0
+    }
+    val orientationLocked = rotationLockState != 0
 
     var scrubPosition by remember {
         mutableFloatStateOf(0f)
@@ -331,17 +338,24 @@ fun VideoPlayerScreen(
     BackHandler(enabled = true, onBack = onBack)
 
     val toggleOrientationLock = {
-        val nextLocked = !orientationLocked
-        orientationLocked = nextLocked
-        if (nextLocked) {
-            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LOCKED
-        } else {
-            applyDefaultOrientation()
+        when (rotationLockState) {
+            0 -> {
+                rotationLockState = 1
+                activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LOCKED
+            }
+            1 -> {
+                rotationLockState = 2
+                activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LOCKED
+            }
+            else -> {
+                rotationLockState = 0
+                activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            }
         }
     }
 
     val toggleLandscape = {
-        orientationLocked = false
+        rotationLockState = 0
         activity?.requestedOrientation = if (isLandscape) {
             ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         } else {
@@ -406,6 +420,7 @@ fun VideoPlayerScreen(
         LandscapePlayerLayout(
             player = controller.player,
             isLandscape = true,
+            rotationDegrees = videoRotationDegrees,
             onToggleLandscape = toggleLandscape,
             headphoneModeEnabled = headphoneModeEnabled,
             onToggleHeadphoneMode = toggleHeadphoneMode,
@@ -516,6 +531,7 @@ fun VideoPlayerScreen(
             onGestureFeedback = onGestureFeedback,
             onSeekGesture = onSeekGesture,
             isLandscape = false,
+            rotationDegrees = videoRotationDegrees,
             headphoneModeEnabled = headphoneModeEnabled,
             onToggleHeadphoneMode = toggleHeadphoneMode,
             orientationLocked = orientationLocked,
