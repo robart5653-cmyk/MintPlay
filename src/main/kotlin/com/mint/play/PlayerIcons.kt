@@ -7,9 +7,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 
@@ -198,14 +196,13 @@ internal fun LandscapeModeIcon(
 @Composable
 internal fun RotationModeIcon(
     modifier: Modifier = Modifier,
-    rotationDegrees: Int,
+    isLandscape: Boolean,
     color: Color
 ) {
     Canvas(modifier = modifier) {
         val stroke = 2.dp.toPx()
-        val portrait = rotationDegrees == 0
-        val screenWidth = size.width * (if (portrait) 0.34f else 0.54f)
-        val screenHeight = size.height * (if (portrait) 0.54f else 0.34f)
+        val screenWidth = size.width * (if (isLandscape) 0.54f else 0.34f)
+        val screenHeight = size.height * (if (isLandscape) 0.34f else 0.54f)
         val screenLeft = (size.width - screenWidth) / 2f
         val screenTop = (size.height - screenHeight) / 2f
 
@@ -215,35 +212,6 @@ internal fun RotationModeIcon(
             size = Size(screenWidth, screenHeight),
             cornerRadius = CornerRadius(size.width * 0.035f),
             style = Stroke(width = stroke)
-        )
-
-        // A curved arrow shows that this button changes the video rotation.
-        val arrowSweep = if (rotationDegrees == -90) -245f else 245f
-        drawArc(
-            color = color,
-            startAngle = if (rotationDegrees == -90) 35f else 215f,
-            sweepAngle = arrowSweep,
-            useCenter = false,
-            topLeft = Offset(size.width * 0.10f, size.height * 0.10f),
-            size = Size(size.width * 0.80f, size.height * 0.80f),
-            style = Stroke(width = stroke, cap = StrokeCap.Round)
-        )
-
-        val arrowHead = Path().apply {
-            if (rotationDegrees == -90) {
-                moveTo(size.width * 0.20f, size.height * 0.30f)
-                lineTo(size.width * 0.34f, size.height * 0.29f)
-                lineTo(size.width * 0.27f, size.height * 0.42f)
-            } else {
-                moveTo(size.width * 0.80f, size.height * 0.70f)
-                lineTo(size.width * 0.66f, size.height * 0.71f)
-                lineTo(size.width * 0.73f, size.height * 0.58f)
-            }
-        }
-        drawPath(
-            path = arrowHead,
-            color = color,
-            style = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round)
         )
     }
 }
