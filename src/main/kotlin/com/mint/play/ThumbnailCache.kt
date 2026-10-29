@@ -1,13 +1,10 @@
 package com.mint.play
 
-import android.Manifest
 import android.content.Context
-import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
 import android.os.Build
-import android.os.Environment
 import android.util.LruCache
 import java.io.File
 import java.io.FileOutputStream
@@ -91,27 +88,23 @@ object ThumbnailCache {
     )
 
     private fun cacheDirectory(context: Context): File? {
-        val canWritePublicStorage = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            Environment.isExternalStorageManager()
-        } else {
-            context.checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) ==
-                PackageManager.PERMISSION_GRANTED
-        }
-
-        if (canWritePublicStorage) {
-            val publicDirectory = File(
-                Environment.getExternalStorageDirectory(),
-                "MintPlay/thumbnail_cache"
-            )
-            if (publicDirectory.isDirectory || publicDirectory.mkdirs()) {
-                ensureNoMedia(publicDirectory)
-                return publicDirectory
+        // App-specific external storage: /Android/data/com.mint.play/files/thumbnail_cache
+        val externalDirectory = context.getExternalFilesDir(null)
+        if (externalDirectory != null) {
+            val directory = File(externalDirectory, "thumbnail_cache")
+            if (directory.isDirectory || directory.mkdirs()) {
+                ensureNoMedia(directory)
+                return directory
             }
         }
 
-        // Keep playback/library usable if public storage access isn't available.
-        val privateDirectory = File(context.cacheDir, "thumbnail_cache")
-        return privateDirectory.takeIf { it.isDirectory || it.mkdirs() }?.also(::ensureNoMedia)
+        // Keep thumbnail generation working if external storage is unavailable.
+        return privateCacheDirectory(context)
+    }
+
+    private fun privateCacheDirectory(context: Context): File? {
+        val directory = File(context.cacheDir, "thumbnail_cache")
+        return directory.takeIf { it.isDirectory || it.mkdirs() }?.also(::ensureNoMedia)
     }
 
     private fun ensureNoMedia(directory: File) {
