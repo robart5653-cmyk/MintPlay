@@ -116,13 +116,13 @@ fun ToolsScreen() {
     }
 
     val extractOutputLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("audio/mp4")
+        ActivityResultContracts.CreateDocument("*/*")
     ) { destination ->
         if (destination != null) startExport(destination, removeVideo = true, outputIsAudio = true)
     }
 
     val trimAudioOutputLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("audio/mp4")
+        ActivityResultContracts.CreateDocument("*/*")
     ) { destination ->
         if (destination != null) {
             startExport(
@@ -133,7 +133,7 @@ fun ToolsScreen() {
     }
 
     val trimVideoOutputLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("video/mp4")
+        ActivityResultContracts.CreateDocument("*/*")
     ) { destination ->
         if (destination != null) {
             startExport(
