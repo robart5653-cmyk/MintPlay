@@ -335,13 +335,13 @@ fun MediaHomeScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 8.dp, bottom = 4.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                        .padding(top = 0.dp, bottom = 2.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Text(
                         text = "History  ›",
                         color = PrimaryText,
-                        fontSize = 24.sp,
+                        fontSize = 22.sp,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.clickable {
                             showFullHistory = true
@@ -349,7 +349,7 @@ fun MediaHomeScreen(
                     )
 
                     LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                         contentPadding = PaddingValues(horizontal = 2.dp)
                     ) {
                         items(
@@ -368,11 +368,18 @@ fun MediaHomeScreen(
                 }
             }
 
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 2.dp, bottom = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
             MediaLibraryDropdown(
                 selectedName = selectedCollectionName,
                 playlists = playlists,
                 selectedCollection = selectedCollection,
-                modifier = Modifier.padding(top = 8.dp),
+                modifier = Modifier.width(104.dp),
                 onSelectAll = {
                     selectedCollection = MediaCollection.All
                     selectedCollectionName = "All"
@@ -433,8 +440,8 @@ fun MediaHomeScreen(
             if (permissionGranted) {
                 Row(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 2.dp, bottom = 8.dp)
+                        .weight(1f)
+                        .padding(top = 2.dp, bottom = 4.dp)
                         .background(NavBackground, RoundedCornerShape(10.dp))
                         .padding(horizontal = 12.dp, vertical = 11.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -472,6 +479,7 @@ fun MediaHomeScreen(
                         )
                     }
                 }
+            }
             }
 
             actionMessage?.let { message ->
