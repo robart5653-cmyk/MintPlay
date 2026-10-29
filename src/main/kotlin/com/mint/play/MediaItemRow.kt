@@ -62,7 +62,7 @@ fun MediaItemRow(
                         .background(NavBackground)
                 }
             )
-            .padding(12.dp),
+            .padding(horizontal = 12.dp, vertical = 5.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.Top
     ) {
@@ -74,7 +74,7 @@ fun MediaItemRow(
                     .width(160.dp)
                     // VIDEO THUMBNAIL HEIGHT: change 100.dp below to make it taller or shorter.
                     .height(100.dp)
-                    .offset(y = 8.dp)
+                    .offset(y = 0.dp)
                     .clip(RoundedCornerShape(8.dp))
                     .clickable { onPlayVideo() }
             )
