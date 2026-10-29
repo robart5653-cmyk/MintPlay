@@ -91,6 +91,10 @@ fun MediaHomeScreen(
         mutableStateOf("")
     }
 
+    var isLibraryDropdownExpanded by remember(isVideo) {
+        mutableStateOf(false)
+    }
+
     var selectedVideo by remember(isVideo) {
         mutableStateOf<MediaItem?>(null)
     }
@@ -379,6 +383,7 @@ fun MediaHomeScreen(
                 selectedName = selectedCollectionName,
                 playlists = playlists,
                 selectedCollection = selectedCollection,
+                onExpandedChange = { isLibraryDropdownExpanded = it },
                 modifier = Modifier.width(104.dp),
                 onSelectAll = {
                     selectedCollection = MediaCollection.All
@@ -437,7 +442,7 @@ fun MediaHomeScreen(
                 }
             )
 
-            if (permissionGranted) {
+            if (permissionGranted && !isLibraryDropdownExpanded) {
                 Row(
                     modifier = Modifier
                         .weight(1f)

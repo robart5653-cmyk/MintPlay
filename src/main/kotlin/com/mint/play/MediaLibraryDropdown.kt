@@ -59,6 +59,7 @@ fun MediaLibraryDropdown(
     onCreatePlaylist: () -> Unit = {},
     onRenamePlaylist: (String, String) -> Unit = { _, _ -> },
     onDeletePlaylist: (String) -> Unit = {},
+    onExpandedChange: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -71,7 +72,10 @@ fun MediaLibraryDropdown(
     Column(modifier = modifier) {
         Row(
             modifier = Modifier
-                .clickable { expanded = !expanded }
+                .clickable {
+                    expanded = !expanded
+                    onExpandedChange(expanded)
+                }
                 .padding(vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -110,6 +114,7 @@ fun MediaLibraryDropdown(
                             onSelectAll()
                             searchText = ""
                             expanded = false
+                            onExpandedChange(false)
                         }
                     )
 
@@ -121,6 +126,7 @@ fun MediaLibraryDropdown(
                             onSelectFavourites()
                             searchText = ""
                             expanded = false
+                            onExpandedChange(false)
                         }
                     )
 
@@ -130,6 +136,7 @@ fun MediaLibraryDropdown(
                         icon = "create",
                         onClick = {
                             expanded = false
+                            onExpandedChange(false)
                             onCreatePlaylist()
                         }
                     )
@@ -219,6 +226,7 @@ fun MediaLibraryDropdown(
                                         onSelectPlaylist(playlist)
                                         searchText = ""
                                         expanded = false
+                            onExpandedChange(false)
                                     },
                                     onRenamePlaylist = { newName ->
                                         onRenamePlaylist(playlist, newName)

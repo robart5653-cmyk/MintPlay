@@ -150,7 +150,13 @@ fun MediaItemActionDialogs(
                             ) {
                                 Text(
                                     text = name,
-                                    color = PrimaryText
+                                    modifier = Modifier
+                                        .background(Accent.copy(alpha = 0.10f), RoundedCornerShape(8.dp))
+                                        .border(1.dp, Accent, RoundedCornerShape(8.dp))
+                                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                                    color = PrimaryText,
+                                    fontSize = 16.sp,
+                                    fontWeight = androidx.compose.ui.text.font.FontWeight.Medium
                                 )
                             }
                         }
