@@ -135,16 +135,6 @@ fun MediaItemMenu(
                     }
                 )
             }
-
-            MenuAction(
-                icon = "ⓘ",
-                title = "File details",
-                subtitle = "View media information",
-                onClick = {
-                    expanded = false
-                    onShowDetails()
-                }
-            )
         }
     }
 }
