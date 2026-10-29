@@ -176,7 +176,7 @@ internal fun PlayerVideoArea(
             factory = { context ->
                 PlayerView(context).apply {
                     useController = false
-                    setArtworkDisplayMode(PlayerView.ARTWORK_DISPLAY_MODE_NEVER)
+                    setArtworkDisplayMode(PlayerView.ARTWORK_DISPLAY_MODE_OFF)
                     resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
                     setShutterBackgroundColor(android.graphics.Color.BLACK)
                     this.player = player
