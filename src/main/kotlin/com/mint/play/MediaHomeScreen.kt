@@ -384,7 +384,7 @@ fun MediaHomeScreen(
                 playlists = playlists,
                 selectedCollection = selectedCollection,
                 onExpandedChange = { isLibraryDropdownExpanded = it },
-                modifier = Modifier.width(if (isLibraryDropdownExpanded) 240.dp else 104.dp),
+                modifier = Modifier.width(if (isLibraryDropdownExpanded) 240.dp else 136.dp),
                 onSelectAll = {
                     selectedCollection = MediaCollection.All
                     selectedCollectionName = "All"
