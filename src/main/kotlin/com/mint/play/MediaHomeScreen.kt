@@ -296,7 +296,7 @@ fun MediaHomeScreen(
                 LazyColumn(
                     modifier = Modifier.weight(1f),
                     contentPadding = PaddingValues(bottom = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     items(
                         items = historyVideos,
@@ -443,7 +443,7 @@ fun MediaHomeScreen(
                         .weight(1f)
                         .padding(top = 2.dp, bottom = 4.dp)
                         .background(NavBackground, RoundedCornerShape(10.dp))
-                        .padding(horizontal = 12.dp, vertical = 11.dp),
+                        .padding(horizontal = 12.dp, vertical = 7.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text("⌕", color = SecondaryText, fontSize = 22.sp)
@@ -551,7 +551,7 @@ fun MediaHomeScreen(
                     LazyColumn(
                         modifier = Modifier.weight(1f),
                         contentPadding = PaddingValues(bottom = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         items(
                             items = filteredVisibleItems,
