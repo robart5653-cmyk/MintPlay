@@ -465,7 +465,7 @@ fun MediaHomeScreen(
                             Box {
                                 if (mediaSearchText.isEmpty()) {
                                     Text(
-                                        text = "Search ${if (isVideo) "videos" else "audio"} in $selectedCollectionName",
+                                        text = "Search",
                                         color = SecondaryText,
                                         fontSize = 14.sp
                                     )
