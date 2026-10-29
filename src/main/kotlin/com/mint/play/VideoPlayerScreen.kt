@@ -10,7 +10,8 @@ import android.content.ContextWrapper
 import android.content.res.Configuration
 import android.content.pm.ActivityInfo
 import android.media.AudioManager
-import android.view.View
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
@@ -71,8 +72,11 @@ fun VideoPlayerScreen(
     val activity = remember(context) {
         context.findActivity()
     }
-    val originalSystemUiVisibility = remember(activity) {
-        activity?.window?.decorView?.systemUiVisibility ?: 0
+    val originalSystemBarsVisible = remember(activity) {
+        activity?.window?.let { window ->
+            WindowInsetsControllerCompat(window, window.decorView)
+                .isVisible(WindowInsetsCompat.Type.systemBars())
+        } ?: true
     }
     val originalWindowBrightness = remember(activity) {
         activity?.window?.attributes?.screenBrightness ?: -1f
@@ -223,12 +227,19 @@ fun VideoPlayerScreen(
         }
     }
 
-    DisposableEffect(controller, activity, originalSystemUiVisibility) {
+    DisposableEffect(controller, activity, originalSystemBarsVisible) {
         onDispose {
             saveCurrentPlaybackPosition()
             activity?.requestedOrientation =
                 ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-            activity?.window?.decorView?.systemUiVisibility = originalSystemUiVisibility
+            activity?.window?.let { window ->
+                val insetsController = WindowInsetsControllerCompat(window, window.decorView)
+                if (originalSystemBarsVisible) {
+                    insetsController.show(WindowInsetsCompat.Type.systemBars())
+                } else {
+                    insetsController.hide(WindowInsetsCompat.Type.systemBars())
+                }
+            }
             activity?.window?.let { window ->
                 val attributes = window.attributes
                 attributes.screenBrightness = originalWindowBrightness
@@ -262,7 +273,7 @@ fun VideoPlayerScreen(
                             activity?.window?.decorView?.postDelayed({
                                 if (resumeAfterUnlock) {
                                     resumeAfterUnlock = false
-                                    if (activity?.hasWindowFocus() == true) {
+                                    if (activity.hasWindowFocus())
                                         controller.player.play()
                                     }
                                 }
@@ -315,18 +326,19 @@ fun VideoPlayerScreen(
         }
     }
 
-    LaunchedEffect(isLandscape, activity, originalSystemUiVisibility) {
-        val decorView = activity?.window?.decorView ?: return@LaunchedEffect
-        decorView.systemUiVisibility = if (isLandscape) {
-            originalSystemUiVisibility
-                .or(View.SYSTEM_UI_FLAG_LAYOUT_STABLE)
-                .or(View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN)
-                .or(View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION)
-                .or(View.SYSTEM_UI_FLAG_FULLSCREEN)
-                .or(View.SYSTEM_UI_FLAG_HIDE_NAVIGATION)
-                .or(View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY)
+    LaunchedEffect(isLandscape, activity, originalSystemBarsVisible) {
+        val window = activity?.window ?: return@LaunchedEffect
+        val insetsController = WindowInsetsControllerCompat(window, window.decorView)
+        if (isLandscape) {
+            insetsController.systemBarsBehavior =
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            insetsController.hide(WindowInsetsCompat.Type.systemBars())
         } else {
-            originalSystemUiVisibility
+            if (originalSystemBarsVisible) {
+                insetsController.show(WindowInsetsCompat.Type.systemBars())
+            } else {
+                insetsController.hide(WindowInsetsCompat.Type.systemBars())
+            }
         }
     }
 
@@ -769,3 +781,4 @@ fun VideoPlayerScreen(
         }
     }
 }
+

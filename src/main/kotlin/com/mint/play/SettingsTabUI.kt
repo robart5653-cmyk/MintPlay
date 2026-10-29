@@ -16,7 +16,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Divider
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -140,7 +140,7 @@ fun SettingsRow(
         }
 
         if (showDivider) {
-            Divider(color = Background, thickness = 1.dp)
+            HorizontalDivider(color = Background, thickness = 1.dp)
         }
     }
 }
@@ -189,7 +189,7 @@ fun SettingsSwitchRow(
         }
 
         if (showDivider) {
-            Divider(color = Background, thickness = 1.dp)
+            HorizontalDivider(color = Background, thickness = 1.dp)
         }
     }
 }

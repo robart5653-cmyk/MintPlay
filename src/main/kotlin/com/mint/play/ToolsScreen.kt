@@ -45,7 +45,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.media3.common.util.UnstableApi
 import androidx.media3.transformer.Transformer
 import java.util.Locale
 import kotlin.concurrent.thread
@@ -53,7 +52,6 @@ import kotlin.concurrent.thread
 private enum class MediaTool { VIDEO_TO_AUDIO, TRIM_MEDIA }
 private const val MIN_TRIM_MS = 500L
 
-@OptIn(UnstableApi::class)
 @Composable
 fun ToolsScreen() {
     val context = LocalContext.current
@@ -465,3 +463,4 @@ private fun formatToolTime(milliseconds: Long): String {
         String.format(Locale.ROOT, "%02d:%02d", minutes, remainingSeconds)
     }
 }
+

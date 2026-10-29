@@ -6,7 +6,6 @@ import android.os.Handler
 import android.os.Looper
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
-import androidx.media3.common.util.UnstableApi
 import androidx.media3.transformer.Composition
 import androidx.media3.transformer.EditedMediaItem
 import androidx.media3.transformer.ExportException
@@ -17,7 +16,6 @@ import java.io.FileInputStream
 import java.io.IOException
 import kotlin.concurrent.thread
 
-@OptIn(UnstableApi::class)
 internal class MediaToolProcessor(context: Context) {
     private val appContext = context.applicationContext
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -69,7 +67,6 @@ internal class MediaToolProcessor(context: Context) {
                                     input.copyTo(destination)
                                 }
                             }
-                            Unit
                         }
                         outputFile.delete()
                         mainHandler.post { onFinished(result) }
@@ -98,3 +95,4 @@ internal class MediaToolProcessor(context: Context) {
         return transformer
     }
 }
+
