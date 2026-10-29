@@ -10,6 +10,7 @@ import android.content.ContextWrapper
 import android.content.res.Configuration
 import android.content.pm.ActivityInfo
 import android.media.AudioManager
+import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import android.net.Uri
@@ -74,8 +75,8 @@ fun VideoPlayerScreen(
     }
     val originalSystemBarsVisible = remember(activity) {
         activity?.window?.let { window ->
-            WindowInsetsControllerCompat(window, window.decorView)
-                .isVisible(WindowInsetsCompat.Type.systemBars())
+            ViewCompat.getRootWindowInsets(window.decorView)
+                ?.isVisible(WindowInsetsCompat.Type.systemBars()) ?: true
         } ?: true
     }
     val originalWindowBrightness = remember(activity) {
