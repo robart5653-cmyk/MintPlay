@@ -443,6 +443,7 @@ fun MediaHomeScreen(
             )
 
             if (permissionGranted && !isLibraryDropdownExpanded) {
+                Spacer(modifier = Modifier.weight(1f))
                 Row(
                     modifier = Modifier
                         .weight(1f)
