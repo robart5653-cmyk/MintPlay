@@ -273,7 +273,7 @@ fun VideoPlayerScreen(
                             activity?.window?.decorView?.postDelayed({
                                 if (resumeAfterUnlock) {
                                     resumeAfterUnlock = false
-                                    if (activity.hasWindowFocus())
+                                    if (activity.hasWindowFocus()) {
                                         controller.player.play()
                                     }
                                 }
