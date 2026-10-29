@@ -551,7 +551,7 @@ fun MediaHomeScreen(
                     LazyColumn(
                         modifier = Modifier.weight(1f),
                         contentPadding = PaddingValues(bottom = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                        verticalArrangement = Arrangement.spacedBy(1.dp)
                     ) {
                         items(
                             items = filteredVisibleItems,

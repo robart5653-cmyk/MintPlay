@@ -62,7 +62,7 @@ fun MediaItemRow(
                         .background(NavBackground)
                 }
             )
-            .padding(horizontal = 12.dp, vertical = 5.dp),
+            .padding(horizontal = 12.dp, vertical = 1.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.Top
     ) {
