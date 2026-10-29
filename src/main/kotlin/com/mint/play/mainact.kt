@@ -140,7 +140,8 @@ fun MyScreen(
         if (
             !playerOpen &&
             audioPlayerController.currentSong != null &&
-            (!showAudioPlayer || selectedTab != 1)
+            !showAudioPlayer &&
+            selectedTab == 1
         ) {
             AudioMiniPlayer(
                 controller = audioPlayerController,
