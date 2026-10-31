@@ -59,6 +59,7 @@ fun ToolsScreen() {
     val mainHandler = remember { Handler(Looper.getMainLooper()) }
 
     var selectedTool by remember { mutableStateOf<MediaTool?>(null) }
+    var showDownloadMedia by remember { mutableStateOf(false) }
     var sourceUri by remember { mutableStateOf<Uri?>(null) }
     var sourceName by remember { mutableStateOf<String?>(null) }
     var sourceIsAudio by remember { mutableStateOf(false) }
@@ -212,7 +213,23 @@ fun ToolsScreen() {
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        if (selectedTool == null) {
+        if (showDownloadMedia) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    "‹", color = Accent, fontSize = 30.sp,
+                    modifier = Modifier.clickable { showDownloadMedia = false }
+                )
+                Column {
+                    Text("Download Media", color = PrimaryText, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                    Text("Download video and audio from supported links.", color = SecondaryText, fontSize = 13.sp)
+                }
+            }
+            InfoPanel("Coming next", "The media downloader will be built here. The existing player and media tools remain unchanged.")
+        } else if (selectedTool == null) {
             Text("Tools", color = PrimaryText, fontSize = 25.sp, fontWeight = FontWeight.Bold)
             Text("Simple ways to work with your media.", color = SecondaryText, fontSize = 14.sp)
             Spacer(Modifier.height(4.dp))
@@ -234,6 +251,9 @@ fun ToolsScreen() {
                 trimEndMs = 0L
                 statusMessage = null
                 errorMessage = null
+            }
+            ToolCard("↓", "Download Media", "Download video and audio from supported links.") {
+                showDownloadMedia = true
             }
         } else {
             Row(
