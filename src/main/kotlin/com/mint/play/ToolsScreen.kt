@@ -1,6 +1,7 @@
 package com.mint.play
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.content.Intent
 import android.media.MediaMetadataRetriever
 import android.net.Uri
@@ -38,6 +39,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
@@ -53,6 +55,11 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import coil.compose.AsyncImage
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.foundation.text.KeyboardOptions
@@ -80,6 +87,9 @@ fun ToolsScreen() {
     }
     var downloadVideoSegments by remember { mutableStateOf(false) }
     var downloadLink by remember { mutableStateOf("") }
+    var onlineMetadata by remember { mutableStateOf<OnlineVideoMetadata?>(null) }
+    var metadataLoading by remember { mutableStateOf(false) }
+    var metadataError by remember { mutableStateOf<String?>(null) }
     var downloadFolderUri by remember { mutableStateOf(downloadPreferences.getString("download_folder_uri", null)?.let { Uri.parse(it) }) }
     var downloadFolderName by remember { mutableStateOf(downloadPreferences.getString("download_folder_name", null) ?: "No folder selected") }
     var segmentStartTime by remember { mutableStateOf("00:00:00") }
@@ -99,6 +109,23 @@ fun ToolsScreen() {
     var statusMessage by remember { mutableStateOf<String?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var activeTransformer by remember { mutableStateOf<Transformer?>(null) }
+
+    LaunchedEffect(downloadLink) {
+        onlineMetadata = null
+        metadataError = null
+        metadataLoading = false
+        if (!downloadLink.trim().startsWith("http://") && !downloadLink.trim().startsWith("https://")) {
+            return@LaunchedEffect
+        }
+        delay(800)
+        metadataLoading = true
+        val result = withContext(Dispatchers.IO) {
+            runCatching { extractOnlineVideoMetadata(context, downloadLink.trim()) }
+        }
+        onlineMetadata = result.getOrNull()
+        metadataError = result.exceptionOrNull()?.message ?: if (onlineMetadata == null) "Couldn't read this link." else null
+        metadataLoading = false
+    }
 
     DisposableEffect(Unit) {
         onDispose { activeTransformer?.cancel() }
@@ -329,7 +356,7 @@ fun ToolsScreen() {
                     )
                     Text(
                         text = if (downloadVideoSegments) {
-                            "Only YouTube is supported"
+                            "Time-range support: YouTube only"
                         } else {
                             "Youtube, Facebook, Instagram, Twitter(X), Tiktok links are supported"
                         },
@@ -343,17 +370,40 @@ fun ToolsScreen() {
                         .clip(RoundedCornerShape(16.dp))
                         .background(NavBackground)
                         .padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text("Video preview", color = PrimaryText, fontWeight = FontWeight.SemiBold)
                     Box(
                         modifier = Modifier.fillMaxWidth()
-                            .height(150.dp)
+                            .height(170.dp)
                             .clip(RoundedCornerShape(12.dp))
                             .background(Background),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("Video thumbnail and name will appear here", color = SecondaryText, fontSize = 13.sp)
+                        val preview = onlineMetadata
+                        if (preview?.firstFrame != null) {
+                            AsyncImage(
+                                model = preview.firstFrame,
+                                contentDescription = "Video thumbnail",
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else if (!preview?.thumbnailUrl.isNullOrBlank()) {
+                            AsyncImage(
+                                model = preview?.thumbnailUrl,
+                                contentDescription = "Video thumbnail",
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
+                        }
+                    }
+                    if (metadataLoading) {
+                        Text("Reading video information…", color = SecondaryText, fontSize = 13.sp)
+                    } else if (onlineMetadata != null) {
+                        Text(onlineMetadata?.title ?: "Untitled video", color = PrimaryText, fontWeight = FontWeight.SemiBold)
+                        Text("Duration: ${onlineMetadata?.durationText ?: "Unavailable"}", color = SecondaryText, fontSize = 13.sp)
+                    } else if (metadataError != null) {
+                        Text("Couldn't load preview: $metadataError", color = SecondaryText, fontSize = 13.sp)
                     }
                 }
 
@@ -416,27 +466,14 @@ fun ToolsScreen() {
                         .clip(RoundedCornerShape(16.dp))
                         .background(NavBackground)
                         .padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Text("Quality", color = PrimaryText, fontWeight = FontWeight.SemiBold)
-                    listOf("144p" to "144p", "1080p" to "1080p", "audio" to "Download as audio").forEach { (value, label) ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth().clickable {
-                                selectedDownloadQuality = value
-                                downloadPreferences.edit().putString("download_quality", value).apply()
-                            },
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            RadioButton(
-                                selected = selectedDownloadQuality == value,
-                                onClick = {
-                                    selectedDownloadQuality = value
-                                    downloadPreferences.edit().putString("download_quality", value).apply()
-                                }
-                            )
-                            Text(label, color = PrimaryText, fontSize = 14.sp)
-                        }
-                    }
+                    Text("Maximum video quality", color = PrimaryText, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        onlineMetadata?.maximumQuality ?: if (metadataLoading) "Checking available formats…" else "Unavailable",
+                        color = SecondaryText,
+                        fontSize = 14.sp
+                    )
                 }
 
                 Column(
@@ -454,7 +491,7 @@ fun ToolsScreen() {
 
                 Button(
                     onClick = { },
-                    enabled = downloadLink.isNotBlank() && selectedDownloadQuality != null,
+                    enabled = false,
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Accent,
