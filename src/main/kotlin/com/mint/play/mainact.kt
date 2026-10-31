@@ -78,7 +78,6 @@ fun MyScreen(
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
     var playerOpen by remember { mutableStateOf(false) }
-    var resumeMusicAfterVideo by remember { mutableStateOf(false) }
     var showAudioPlayer by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val audioPlayerController = remember(context) { AudioPlayerController(context) }
@@ -129,14 +128,10 @@ fun MyScreen(
                 onRequestPermissions = onRequestPermissions,
                 onVideoPlayerVisibilityChanged = { visible ->
                     if (visible && !playerOpen) {
-                        resumeMusicAfterVideo = audioPlayerController.pauseForVideo()
+                        audioPlayerController.pauseForVideo()
                         playerOpen = true
                     } else if (!visible && playerOpen) {
                         playerOpen = false
-                        if (resumeMusicAfterVideo) {
-                            audioPlayerController.resumeAfterVideo()
-                        }
-                        resumeMusicAfterVideo = false
                     }
                 },
                 audioPlayerController = audioPlayerController,
