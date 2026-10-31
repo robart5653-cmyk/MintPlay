@@ -7,6 +7,7 @@ import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.provider.OpenableColumns
+import android.provider.DocumentsContract
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -79,6 +80,8 @@ fun ToolsScreen() {
     }
     var downloadVideoSegments by remember { mutableStateOf(false) }
     var downloadLink by remember { mutableStateOf("") }
+    var downloadFolderUri by remember { mutableStateOf(downloadPreferences.getString("download_folder_uri", null)?.let { Uri.parse(it) }) }
+    var downloadFolderName by remember { mutableStateOf(downloadPreferences.getString("download_folder_name", null) ?: "No folder selected") }
     var segmentStartTime by remember { mutableStateOf("00:00:00") }
     var segmentEndTime by remember { mutableStateOf("00:00:00") }
     var showSegmentTimeDialog by remember { mutableStateOf(false) }
@@ -167,6 +170,23 @@ fun ToolsScreen() {
                 destination, removeVideo = false, outputIsAudio = false,
                 startMs = trimStartMs, endMs = trimEndMs
             )
+        }
+    }
+
+    val downloadFolderLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree()
+    ) { uri ->
+        if (uri != null) {
+            val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            runCatching { context.contentResolver.takePersistableUriPermission(uri, flags) }
+            val folderName = queryFolderName(context, uri)
+            downloadFolderUri = uri
+            downloadFolderName = folderName
+            downloadPreferences.edit()
+                .putString("download_folder_uri", uri.toString())
+                .putString("download_folder_name", folderName)
+                .apply()
         }
     }
 
@@ -423,11 +443,13 @@ fun ToolsScreen() {
                     modifier = Modifier.fillMaxWidth()
                         .clip(RoundedCornerShape(16.dp))
                         .background(NavBackground)
+                        .clickable { downloadFolderLauncher.launch(downloadFolderUri) }
                         .padding(14.dp),
                     verticalArrangement = Arrangement.spacedBy(5.dp)
                 ) {
                     Text("Download path", color = PrimaryText, fontWeight = FontWeight.SemiBold)
-                    Text("Previously selected download folder will appear here", color = SecondaryText, fontSize = 13.sp)
+                    Text(downloadFolderName, color = SecondaryText, fontSize = 13.sp)
+                    Text("Tap to choose a folder", color = Accent, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                 }
 
                 Button(
@@ -711,6 +733,19 @@ private fun queryDisplayName(context: Context, uri: Uri): String =
         context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
             ?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
     }.getOrNull() ?: "Selected media"
+
+private fun queryFolderName(context: Context, treeUri: Uri): String =
+    runCatching {
+        val documentUri = DocumentsContract.buildDocumentUriUsingTree(
+            treeUri,
+            DocumentsContract.getTreeDocumentId(treeUri)
+        )
+        context.contentResolver.query(
+            documentUri,
+            arrayOf(DocumentsContract.Document.COLUMN_DISPLAY_NAME),
+            null, null, null
+        )?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
+    }.getOrNull() ?: "Selected folder"
 
 private fun formatToolTime(milliseconds: Long): String {
     val seconds = milliseconds.coerceAtLeast(0L) / 1000L
