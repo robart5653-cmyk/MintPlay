@@ -11,6 +11,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -40,6 +41,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -252,7 +258,7 @@ fun ToolsScreen() {
                 statusMessage = null
                 errorMessage = null
             }
-            ToolCard("↓", "Download Media", "Download video and audio from supported links.") {
+            ToolCard("DOWNLOAD_ICON", "Download Media", "Download video and audio from supported links.") {
                 showDownloadMedia = true
             }
         } else {
@@ -442,7 +448,32 @@ private fun ToolCard(
                 .background(Accent.copy(alpha = 0.13f)),
             contentAlignment = Alignment.Center
         ) {
-            Text(symbol, color = Accent, fontSize = 27.sp, fontWeight = FontWeight.Medium)
+            if (symbol == "DOWNLOAD_ICON") {
+                Canvas(modifier = Modifier.size(30.dp)) {
+                    scale(size.width / 512f, size.height / 512f, pivot = androidx.compose.ui.geometry.Offset.Zero) {
+                        val iconPath = Path().apply {
+                            moveTo(256f, 64f)
+                            lineTo(256f, 318f)
+                            moveTo(160f, 226f)
+                            lineTo(256f, 322f)
+                            lineTo(352f, 226f)
+                            moveTo(72f, 346f)
+                            lineTo(72f, 400f)
+                            cubicTo(72f, 422.1f, 89.9f, 440f, 112f, 440f)
+                            lineTo(400f, 440f)
+                            cubicTo(422.1f, 440f, 440f, 422.1f, 440f, 400f)
+                            lineTo(440f, 346f)
+                        }
+                        drawPath(
+                            path = iconPath,
+                            color = Accent,
+                            style = Stroke(width = 40f, cap = StrokeCap.Round, join = StrokeJoin.Round)
+                        )
+                    }
+                }
+            } else {
+                Text(symbol, color = Accent, fontSize = 27.sp, fontWeight = FontWeight.Medium)
+            }
         }
         Column(Modifier.weight(1f)) {
             Text(title, color = PrimaryText, fontSize = 16.sp, fontWeight = FontWeight.Bold)
