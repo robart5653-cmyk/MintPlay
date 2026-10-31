@@ -66,6 +66,12 @@ fun ToolsScreen() {
 
     var selectedTool by remember { mutableStateOf<MediaTool?>(null) }
     var showDownloadMedia by remember { mutableStateOf(false) }
+    val downloadPreferences = remember(context) {
+        context.getSharedPreferences("mintplay_download_settings", Context.MODE_PRIVATE)
+    }
+    var downloadVideoSegments by remember {
+        mutableStateOf(downloadPreferences.getBoolean("download_video_segments", false))
+    }
     var sourceUri by remember { mutableStateOf<Uri?>(null) }
     var sourceName by remember { mutableStateOf<String?>(null) }
     var sourceIsAudio by remember { mutableStateOf(false) }
@@ -234,7 +240,18 @@ fun ToolsScreen() {
                     Text("Download video and audio from supported links.", color = SecondaryText, fontSize = 13.sp)
                 }
             }
-            InfoPanel("Coming next", "The media downloader will be built here. The existing player and media tools remain unchanged.")
+            SettingsSwitchRow(
+                title = "Download Video Segments",
+                subtitle = "Enable downloading selected sections of a video.",
+                checked = downloadVideoSegments,
+                onCheckedChange = { enabled ->
+                    downloadVideoSegments = enabled
+                    downloadPreferences.edit()
+                        .putBoolean("download_video_segments", enabled)
+                        .apply()
+                },
+                showDivider = false
+            )
         } else if (selectedTool == null) {
             Text("Tools", color = PrimaryText, fontSize = 25.sp, fontWeight = FontWeight.Bold)
             Text("Simple ways to work with your media.", color = SecondaryText, fontSize = 14.sp)
