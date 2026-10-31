@@ -27,6 +27,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -52,6 +54,8 @@ import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.input.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -79,6 +83,8 @@ fun ToolsScreen() {
     var downloadLink by remember { mutableStateOf("") }
     var segmentStartTime by remember { mutableStateOf("00:00:00") }
     var segmentEndTime by remember { mutableStateOf("00:00:00") }
+    var showSegmentTimeDialog by remember { mutableStateOf(false) }
+    var editingSegmentStart by remember { mutableStateOf(true) }
     var selectedDownloadQuality by remember {
         mutableStateOf(downloadPreferences.getString("download_quality", null))
     }
@@ -229,6 +235,17 @@ fun ToolsScreen() {
         }
     }
 
+    if (showSegmentTimeDialog) {
+        SegmentTimeDialog(
+            initialTime = if (editingSegmentStart) segmentStartTime else segmentEndTime,
+            onDismiss = { showSegmentTimeDialog = false },
+            onConfirm = { time ->
+                if (editingSegmentStart) segmentStartTime = time else segmentEndTime = time
+                showSegmentTimeDialog = false
+            }
+        )
+    }
+
     Column(
         modifier = Modifier.fillMaxSize()
             .verticalScroll(rememberScrollState())
@@ -334,41 +351,35 @@ fun ToolsScreen() {
                         )
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                                 Text("From", color = PrimaryText, fontWeight = FontWeight.SemiBold)
                                 OutlinedTextField(
-                                    value = segmentStartTime,
-                                    onValueChange = { segmentStartTime = it },
-                                    modifier = Modifier.fillMaxWidth(),
+                                    value = segmentStartTime, onValueChange = {}, readOnly = true,
+                                    modifier = Modifier.fillMaxWidth().clickable { editingSegmentStart = true; showSegmentTimeDialog = true },
                                     singleLine = true,
                                     textStyle = TextStyle(color = PrimaryText, fontSize = 15.sp),
                                     shape = RoundedCornerShape(8.dp),
                                     colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = Accent,
-                                        unfocusedBorderColor = Accent,
-                                        cursorColor = Accent,
-                                        focusedTextColor = PrimaryText,
-                                        unfocusedTextColor = PrimaryText
+                                        focusedBorderColor = Accent, unfocusedBorderColor = Accent,
+                                        focusedTextColor = PrimaryText, unfocusedTextColor = PrimaryText
                                     )
                                 )
                             }
+                            Text("-", color = SecondaryText, modifier = Modifier.padding(top = 25.dp))
                             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                                 Text("To", color = PrimaryText, fontWeight = FontWeight.SemiBold)
                                 OutlinedTextField(
-                                    value = segmentEndTime,
-                                    onValueChange = { segmentEndTime = it },
-                                    modifier = Modifier.fillMaxWidth(),
+                                    value = segmentEndTime, onValueChange = {}, readOnly = true,
+                                    modifier = Modifier.fillMaxWidth().clickable { editingSegmentStart = false; showSegmentTimeDialog = true },
                                     singleLine = true,
                                     textStyle = TextStyle(color = PrimaryText, fontSize = 15.sp),
                                     shape = RoundedCornerShape(8.dp),
                                     colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = Accent,
-                                        unfocusedBorderColor = Accent,
-                                        cursorColor = Accent,
-                                        focusedTextColor = PrimaryText,
-                                        unfocusedTextColor = PrimaryText
+                                        focusedBorderColor = Accent, unfocusedBorderColor = Accent,
+                                        focusedTextColor = PrimaryText, unfocusedTextColor = PrimaryText
                                     )
                                 )
                             }
@@ -709,3 +720,39 @@ private fun formatToolTime(milliseconds: Long): String {
     }
 }
 
+
+
+@Composable
+private fun SegmentTimeDialog(initialTime: String, onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
+    val parts = initialTime.split(":")
+    var hours by remember(initialTime) { mutableStateOf(parts.getOrNull(0).orEmpty().filter(Char::isDigit).take(2)) }
+    var minutes by remember(initialTime) { mutableStateOf(parts.getOrNull(1).orEmpty().filter(Char::isDigit).take(2)) }
+    var seconds by remember(initialTime) { mutableStateOf(parts.getOrNull(2).orEmpty().filter(Char::isDigit).take(2)) }
+
+    fun padded(value: String, max: Int): String =
+        value.toIntOrNull()?.coerceIn(0, max)?.toString()?.padStart(2, '0') ?: "00"
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = NavBackground,
+        title = { Text("Set timestamp", color = PrimaryText, fontWeight = FontWeight.SemiBold) },
+        text = {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                    OutlinedTextField(hours, { hours = it.filter(Char::isDigit).take(2) }, modifier = Modifier.fillMaxWidth(), singleLine = true, textStyle = TextStyle(color = PrimaryText, fontSize = 20.sp), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(8.dp), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Accent, unfocusedBorderColor = Accent, cursorColor = Accent, focusedTextColor = PrimaryText, unfocusedTextColor = PrimaryText))
+                    Text("h", color = SecondaryText, fontSize = 12.sp)
+                }
+                Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                    OutlinedTextField(minutes, { minutes = it.filter(Char::isDigit).take(2) }, modifier = Modifier.fillMaxWidth(), singleLine = true, textStyle = TextStyle(color = PrimaryText, fontSize = 20.sp), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(8.dp), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Accent, unfocusedBorderColor = Accent, cursorColor = Accent, focusedTextColor = PrimaryText, unfocusedTextColor = PrimaryText))
+                    Text("m", color = SecondaryText, fontSize = 12.sp)
+                }
+                Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                    OutlinedTextField(seconds, { seconds = it.filter(Char::isDigit).take(2) }, modifier = Modifier.fillMaxWidth(), singleLine = true, textStyle = TextStyle(color = PrimaryText, fontSize = 20.sp), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(8.dp), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Accent, unfocusedBorderColor = Accent, cursorColor = Accent, focusedTextColor = PrimaryText, unfocusedTextColor = PrimaryText))
+                    Text("s", color = SecondaryText, fontSize = 12.sp)
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = { onConfirm("${padded(hours, 99)}:${padded(minutes, 59)}:${padded(seconds, 59)}") }) { Text("Done", color = Accent) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = SecondaryText) } }
+    )
+}
