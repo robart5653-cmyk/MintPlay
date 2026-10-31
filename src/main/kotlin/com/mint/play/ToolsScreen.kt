@@ -28,6 +28,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
@@ -71,6 +73,10 @@ fun ToolsScreen() {
     }
     var downloadVideoSegments by remember {
         mutableStateOf(downloadPreferences.getBoolean("download_video_segments", false))
+    }
+    var downloadLink by remember { mutableStateOf("") }
+    var selectedDownloadQuality by remember {
+        mutableStateOf(downloadPreferences.getString("download_quality", null))
     }
     var sourceUri by remember { mutableStateOf<Uri?>(null) }
     var sourceName by remember { mutableStateOf<String?>(null) }
@@ -252,6 +258,88 @@ fun ToolsScreen() {
                 },
                 showDivider = false
             )
+            if (!downloadVideoSegments) {
+                OutlinedTextField(
+                    value = downloadLink,
+                    onValueChange = { downloadLink = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    label = { Text("Video link") },
+                    placeholder = { Text("Paste video link here") }
+                )
+
+                Column(
+                    modifier = Modifier.fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(NavBackground)
+                        .padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text("Video preview", color = PrimaryText, fontWeight = FontWeight.SemiBold)
+                    Box(
+                        modifier = Modifier.fillMaxWidth()
+                            .height(150.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Background),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("Video thumbnail and name will appear here", color = SecondaryText, fontSize = 13.sp)
+                    }
+                }
+
+                Column(
+                    modifier = Modifier.fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(NavBackground)
+                        .padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    Text("Quality", color = PrimaryText, fontWeight = FontWeight.SemiBold)
+                    listOf("144p" to "144p", "1080p" to "1080p", "audio" to "Download as audio").forEach { (value, label) ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth().clickable {
+                                selectedDownloadQuality = value
+                                downloadPreferences.edit().putString("download_quality", value).apply()
+                            },
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = selectedDownloadQuality == value,
+                                onClick = {
+                                    selectedDownloadQuality = value
+                                    downloadPreferences.edit().putString("download_quality", value).apply()
+                                }
+                            )
+                            Text(label, color = PrimaryText, fontSize = 14.sp)
+                        }
+                    }
+                }
+
+                Column(
+                    modifier = Modifier.fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(NavBackground)
+                        .padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(5.dp)
+                ) {
+                    Text("Download path", color = PrimaryText, fontWeight = FontWeight.SemiBold)
+                    Text("Previously selected download folder will appear here", color = SecondaryText, fontSize = 13.sp)
+                }
+
+                Button(
+                    onClick = { },
+                    enabled = downloadLink.isNotBlank() && selectedDownloadQuality != null,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Accent,
+                        contentColor = Background,
+                        disabledContainerColor = NavBackground,
+                        disabledContentColor = SecondaryText
+                    )
+                ) {
+                    Text("Download", fontWeight = FontWeight.Bold)
+                }
+            }
         } else if (selectedTool == null) {
             Text("Tools", color = PrimaryText, fontSize = 25.sp, fontWeight = FontWeight.Bold)
             Text("Simple ways to work with your media.", color = SecondaryText, fontSize = 14.sp)
