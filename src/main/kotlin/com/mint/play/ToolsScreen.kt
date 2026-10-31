@@ -29,6 +29,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
@@ -50,6 +51,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -259,14 +261,41 @@ fun ToolsScreen() {
                 showDivider = false
             )
             if (!downloadVideoSegments) {
-                OutlinedTextField(
-                    value = downloadLink,
-                    onValueChange = { downloadLink = it },
+                Column(
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    label = { Text("Video link") },
-                    placeholder = { Text("Paste video link here") }
-                )
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        text = "Video link",
+                        color = PrimaryText,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    OutlinedTextField(
+                        value = downloadLink,
+                        onValueChange = { downloadLink = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        textStyle = TextStyle(
+                            color = PrimaryText,
+                            fontSize = 15.sp
+                        ),
+                        shape = RoundedCornerShape(8.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Accent,
+                            unfocusedBorderColor = Accent,
+                            cursorColor = Accent,
+                            focusedTextColor = PrimaryText,
+                            unfocusedTextColor = PrimaryText
+                        ),
+                        placeholder = { Text("put video link here") }
+                    )
+                    Text(
+                        text = "YouTube, Facebook, Instagram, twitter(X) and tiktok links are supposed",
+                        color = PrimaryText,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
 
                 Column(
                     modifier = Modifier.fillMaxWidth()
