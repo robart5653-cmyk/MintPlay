@@ -729,12 +729,12 @@ private fun formatToolTime(milliseconds: Long): String {
 @Composable
 private fun SegmentTimeDialog(initialTime: String, onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
     val parts = initialTime.split(":")
-    var hours by remember(initialTime) { mutableStateOf(parts.getOrNull(0).orEmpty().filter(Char::isDigit).take(2)) }
-    var minutes by remember(initialTime) { mutableStateOf(parts.getOrNull(1).orEmpty().filter(Char::isDigit).take(2)) }
-    var seconds by remember(initialTime) { mutableStateOf(parts.getOrNull(2).orEmpty().filter(Char::isDigit).take(2)) }
+    var hours by remember(initialTime) { mutableStateOf(parts.getOrNull(0).orEmpty().filter(Char::isDigit)) }
+    var minutes by remember(initialTime) { mutableStateOf(parts.getOrNull(1).orEmpty().filter(Char::isDigit)) }
+    var seconds by remember(initialTime) { mutableStateOf(parts.getOrNull(2).orEmpty().filter(Char::isDigit)) }
 
-    fun padded(value: String, max: Int): String =
-        value.toIntOrNull()?.coerceIn(0, max)?.toString()?.padStart(2, '0') ?: "00"
+    fun normalized(value: String, max: Long): String =
+        (value.toLongOrNull()?.coerceAtMost(max)?.toString() ?: "0").padStart(2, '0')
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -743,20 +743,20 @@ private fun SegmentTimeDialog(initialTime: String, onDismiss: () -> Unit, onConf
         text = {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                    OutlinedTextField(hours, { hours = it.filter(Char::isDigit).take(2) }, modifier = Modifier.fillMaxWidth(), singleLine = true, textStyle = TextStyle(color = PrimaryText, fontSize = 15.sp), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(8.dp), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Accent, unfocusedBorderColor = Accent, cursorColor = Accent, focusedTextColor = PrimaryText, unfocusedTextColor = PrimaryText))
-                    Text("h", color = SecondaryText, fontSize = 12.sp)
+                    OutlinedTextField(hours, { hours = it.filter(Char::isDigit) }, modifier = Modifier.fillMaxWidth(), singleLine = true, textStyle = TextStyle(color = PrimaryText, fontSize = 15.sp), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(8.dp), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Accent, unfocusedBorderColor = Accent, cursorColor = Accent, focusedTextColor = PrimaryText, unfocusedTextColor = PrimaryText))
+                    Text("hours", color = PrimaryText, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                 }
                 Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                    OutlinedTextField(minutes, { minutes = it.filter(Char::isDigit).take(2) }, modifier = Modifier.fillMaxWidth(), singleLine = true, textStyle = TextStyle(color = PrimaryText, fontSize = 15.sp), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(8.dp), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Accent, unfocusedBorderColor = Accent, cursorColor = Accent, focusedTextColor = PrimaryText, unfocusedTextColor = PrimaryText))
-                    Text("m", color = SecondaryText, fontSize = 12.sp)
+                    OutlinedTextField(minutes, { minutes = it.filter(Char::isDigit) }, modifier = Modifier.fillMaxWidth(), singleLine = true, textStyle = TextStyle(color = PrimaryText, fontSize = 15.sp), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(8.dp), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Accent, unfocusedBorderColor = Accent, cursorColor = Accent, focusedTextColor = PrimaryText, unfocusedTextColor = PrimaryText))
+                    Text("minutes", color = PrimaryText, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                 }
                 Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                    OutlinedTextField(seconds, { seconds = it.filter(Char::isDigit).take(2) }, modifier = Modifier.fillMaxWidth(), singleLine = true, textStyle = TextStyle(color = PrimaryText, fontSize = 15.sp), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(8.dp), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Accent, unfocusedBorderColor = Accent, cursorColor = Accent, focusedTextColor = PrimaryText, unfocusedTextColor = PrimaryText))
-                    Text("s", color = SecondaryText, fontSize = 12.sp)
+                    OutlinedTextField(seconds, { seconds = it.filter(Char::isDigit) }, modifier = Modifier.fillMaxWidth(), singleLine = true, textStyle = TextStyle(color = PrimaryText, fontSize = 15.sp), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(8.dp), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Accent, unfocusedBorderColor = Accent, cursorColor = Accent, focusedTextColor = PrimaryText, unfocusedTextColor = PrimaryText))
+                    Text("seconds", color = PrimaryText, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                 }
             }
         },
-        confirmButton = { TextButton(onClick = { onConfirm("${padded(hours, 99)}:${padded(minutes, 59)}:${padded(seconds, 59)}") }) { Text("Done", color = Accent) } },
+        confirmButton = { TextButton(onClick = { onConfirm("${normalized(hours, Long.MAX_VALUE)}:${normalized(minutes, 59L)}:${normalized(seconds, 59L)}") }) { Text("Done", color = Accent) } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = SecondaryText) } }
     )
 }
