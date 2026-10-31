@@ -11,7 +11,9 @@ internal data class OnlineVideoMetadata(
     val durationText: String?,
     val thumbnailUrl: String?,
     val maximumQuality: String?,
-    val firstFrame: Bitmap?
+    val firstFrame: Bitmap?,
+    val bestStreamUrl: String?,
+    val streamHeaders: Map<String, String>
 )
 
 internal fun extractOnlineVideoMetadata(context: Context, url: String): OnlineVideoMetadata {
@@ -20,16 +22,10 @@ internal fun extractOnlineVideoMetadata(context: Context, url: String): OnlineVi
     val videoFormats = info.formats.orEmpty().filter { it.height > 0 && it.vcodec != "none" }
     val bestFormat = videoFormats.maxByOrNull { it.height }
     val thumbnailUrl = info.thumbnail?.takeIf { it.startsWith("https://") || it.startsWith("http://") }
-    val firstFrame = if (thumbnailUrl == null && bestFormat?.url != null) {
-        val retriever = MediaMetadataRetriever()
-        try {
-            retriever.setDataSource(bestFormat.url, bestFormat.httpHeaders ?: emptyMap())
-            retriever.getFrameAtTime(0L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
-        } catch (_: Exception) {
-            null
-        } finally {
-            runCatching { retriever.release() }
-        }
+    val streamUrl = bestFormat?.url
+    val streamHeaders = bestFormat?.httpHeaders ?: emptyMap()
+    val firstFrame = if (thumbnailUrl == null && streamUrl != null) {
+        extractVideoFrame(streamUrl, streamHeaders)
     } else null
     val duration = info.duration.toLong().takeIf { it > 0L }?.let { seconds ->
         val hours = seconds / 3600L
@@ -43,6 +39,20 @@ internal fun extractOnlineVideoMetadata(context: Context, url: String): OnlineVi
         durationText = duration,
         thumbnailUrl = thumbnailUrl,
         maximumQuality = bestFormat?.height?.let { "${it}p" },
-        firstFrame = firstFrame
+        firstFrame = firstFrame,
+        bestStreamUrl = streamUrl,
+        streamHeaders = streamHeaders
     )
+}
+
+internal fun extractVideoFrame(url: String, headers: Map<String, String>): Bitmap? {
+    val retriever = MediaMetadataRetriever()
+    return try {
+        retriever.setDataSource(url, headers)
+        retriever.getFrameAtTime(0L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+    } catch (_: Exception) {
+        null
+    } finally {
+        runCatching { retriever.release() }
+    }
 }

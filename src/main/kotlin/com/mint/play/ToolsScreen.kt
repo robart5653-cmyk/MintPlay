@@ -90,6 +90,8 @@ fun ToolsScreen() {
     var onlineMetadata by remember { mutableStateOf<OnlineVideoMetadata?>(null) }
     var metadataLoading by remember { mutableStateOf(false) }
     var metadataError by remember { mutableStateOf<String?>(null) }
+    var fallbackFrame by remember { mutableStateOf<Bitmap?>(null) }
+    var frameFallbackAttempted by remember { mutableStateOf(false) }
     var downloadFolderUri by remember { mutableStateOf(downloadPreferences.getString("download_folder_uri", null)?.let { Uri.parse(it) }) }
     var downloadFolderName by remember { mutableStateOf(downloadPreferences.getString("download_folder_name", null) ?: "No folder selected") }
     var segmentStartTime by remember { mutableStateOf("00:00:00") }
@@ -113,6 +115,8 @@ fun ToolsScreen() {
     LaunchedEffect(downloadLink) {
         onlineMetadata = null
         metadataError = null
+        fallbackFrame = null
+        frameFallbackAttempted = false
         metadataLoading = false
         if (!downloadLink.trim().startsWith("http://") && !downloadLink.trim().startsWith("https://")) {
             return@LaunchedEffect
@@ -381,9 +385,10 @@ fun ToolsScreen() {
                         contentAlignment = Alignment.Center
                     ) {
                         val preview = onlineMetadata
-                        if (preview?.firstFrame != null) {
+                        val frame = fallbackFrame ?: preview?.firstFrame
+                        if (frame != null) {
                             AsyncImage(
-                                model = preview.firstFrame,
+                                model = frame,
                                 contentDescription = "Video thumbnail",
                                 modifier = Modifier.fillMaxSize(),
                                 contentScale = ContentScale.Crop
@@ -393,7 +398,18 @@ fun ToolsScreen() {
                                 model = preview?.thumbnailUrl,
                                 contentDescription = "Video thumbnail",
                                 modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Crop
+                                contentScale = ContentScale.Crop,
+                                onError = {
+                                    val streamUrl = preview?.bestStreamUrl
+                                    if (!frameFallbackAttempted && streamUrl != null) {
+                                        frameFallbackAttempted = true
+                                        val headers = preview?.streamHeaders ?: emptyMap()
+                                        thread(name = "MintPlayPreviewFrame") {
+                                            val extracted = extractVideoFrame(streamUrl, headers)
+                                            mainHandler.post { fallbackFrame = extracted }
+                                        }
+                                    }
+                                }
                             )
                         }
                     }
