@@ -168,6 +168,21 @@ class AudioPlayerController(context: Context) {
         currentIndex = if (queue.isEmpty() || index !in queue.indices) -1 else index
     }
 
+    fun pauseForVideo(): Boolean {
+        val activePlayer = playerInstance ?: return false
+        val wasPlaying = activePlayer.isPlaying || activePlayer.playWhenReady
+        if (wasPlaying) activePlayer.pause()
+        refreshProgress()
+        return wasPlaying
+    }
+
+    fun resumeAfterVideo() {
+        val activePlayer = playerInstance ?: return
+        if (activePlayer.mediaItemCount == 0) return
+        activePlayer.play()
+        refreshProgress()
+    }
+
     fun release() {
         playerInstance?.release()
         playerInstance = null
