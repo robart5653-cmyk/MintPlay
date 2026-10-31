@@ -77,9 +77,7 @@ fun ToolsScreen() {
     val downloadPreferences = remember(context) {
         context.getSharedPreferences("mintplay_download_settings", Context.MODE_PRIVATE)
     }
-    var downloadVideoSegments by remember {
-        mutableStateOf(downloadPreferences.getBoolean("download_video_segments", false))
-    }
+    var downloadVideoSegments by remember { mutableStateOf(false) }
     var downloadLink by remember { mutableStateOf("") }
     var segmentStartTime by remember { mutableStateOf("00:00:00") }
     var segmentEndTime by remember { mutableStateOf("00:00:00") }
@@ -356,32 +354,38 @@ fun ToolsScreen() {
                         ) {
                             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                                 Text("From", color = PrimaryText, fontWeight = FontWeight.SemiBold)
-                                OutlinedTextField(
-                                    value = segmentStartTime, onValueChange = {}, readOnly = true,
-                                    modifier = Modifier.fillMaxWidth().clickable { editingSegmentStart = true; showSegmentTimeDialog = true },
-                                    singleLine = true,
-                                    textStyle = TextStyle(color = PrimaryText, fontSize = 15.sp),
-                                    shape = RoundedCornerShape(8.dp),
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = Accent, unfocusedBorderColor = Accent,
-                                        focusedTextColor = PrimaryText, unfocusedTextColor = PrimaryText
+                                Box {
+                                    OutlinedTextField(
+                                        value = segmentStartTime, onValueChange = {}, readOnly = true,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        singleLine = true,
+                                        textStyle = TextStyle(color = PrimaryText, fontSize = 15.sp),
+                                        shape = RoundedCornerShape(8.dp),
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedBorderColor = Accent, unfocusedBorderColor = Accent,
+                                            focusedTextColor = PrimaryText, unfocusedTextColor = PrimaryText
+                                        )
                                     )
-                                )
+                                    Box(Modifier.matchParentSize().clickable { editingSegmentStart = true; showSegmentTimeDialog = true })
+                                }
                             }
                             Text("-", color = SecondaryText, modifier = Modifier.padding(top = 25.dp))
                             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                                 Text("To", color = PrimaryText, fontWeight = FontWeight.SemiBold)
-                                OutlinedTextField(
-                                    value = segmentEndTime, onValueChange = {}, readOnly = true,
-                                    modifier = Modifier.fillMaxWidth().clickable { editingSegmentStart = false; showSegmentTimeDialog = true },
-                                    singleLine = true,
-                                    textStyle = TextStyle(color = PrimaryText, fontSize = 15.sp),
-                                    shape = RoundedCornerShape(8.dp),
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = Accent, unfocusedBorderColor = Accent,
-                                        focusedTextColor = PrimaryText, unfocusedTextColor = PrimaryText
+                                Box {
+                                    OutlinedTextField(
+                                        value = segmentEndTime, onValueChange = {}, readOnly = true,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        singleLine = true,
+                                        textStyle = TextStyle(color = PrimaryText, fontSize = 15.sp),
+                                        shape = RoundedCornerShape(8.dp),
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedBorderColor = Accent, unfocusedBorderColor = Accent,
+                                            focusedTextColor = PrimaryText, unfocusedTextColor = PrimaryText
+                                        )
                                     )
-                                )
+                                    Box(Modifier.matchParentSize().clickable { editingSegmentStart = false; showSegmentTimeDialog = true })
+                                }
                             }
                         }
                     }
