@@ -45,7 +45,7 @@ java = ["src/test/java", "src/test/kotlin"]
 resources = ["src/test/resources"]
 
 [dependencies]
-implementation = ["kotlin-stdlib", "androidx.activity:activity-compose:1.13.0", "androidx.compose.ui:ui:1.11.2", "androidx.compose.foundation:foundation:1.11.2", "androidx.compose.ui:ui-tooling-preview:1.11.2", "androidx.compose.material3:material3:1.4.0", "androidx.lifecycle:lifecycle-runtime-compose:2.11.0", "androidx.media3:media3-exoplayer:1.11.1", "androidx.media3:media3-ui:1.11.1", "androidx.media3:media3-transformer:1.11.1", "org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.1", "io.github.junkfood02.youtubedl-android:library:0.18.1", "io.coil-kt:coil-compose:2.7.0"]
+implementation = ["kotlin-stdlib", "androidx.activity:activity-compose:1.13.0", "androidx.compose.ui:ui:1.11.2", "androidx.compose.foundation:foundation:1.11.2", "androidx.compose.ui:ui-tooling-preview:1.11.2", "androidx.compose.material3:material3:1.4.0", "androidx.lifecycle:lifecycle-runtime-compose:2.11.0", "androidx.media3:media3-exoplayer:1.11.1", "androidx.media3:media3-ui:1.11.1", "androidx.media3:media3-transformer:1.11.1", "org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.1"]
 
 [android]
 namespace = "com.mint.play"
