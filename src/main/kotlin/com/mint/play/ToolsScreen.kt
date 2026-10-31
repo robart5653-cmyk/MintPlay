@@ -1,1 +1,622 @@
-{"successful":true,"data":{"results":"","stdout":"package com.mint.play\n\nimport android.content.Context\nimport android.content.Intent\nimport android.media.MediaMetadataRetriever\nimport android.net.Uri\nimport android.os.Handler\nimport android.os.Looper\nimport android.provider.OpenableColumns\nimport androidx.activity.compose.rememberLauncherForActivityResult\nimport androidx.activity.result.contract.ActivityResultContracts\nimport androidx.compose.foundation.background\nimport androidx.compose.foundation.clickable\nimport androidx.compose.foundation.Canvas\nimport androidx.compose.foundation.layout.Arrangement\nimport androidx.compose.foundation.layout.Box\nimport androidx.compose.foundation.layout.Column\nimport androidx.compose.foundation.layout.Row\nimport androidx.compose.foundation.layout.Spacer\nimport androidx.compose.foundation.layout.fillMaxSize\nimport androidx.compose.foundation.layout.fillMaxWidth\nimport androidx.compose.foundation.layout.height\nimport androidx.compose.foundation.layout.padding\nimport androidx.compose.foundation.layout.size\nimport androidx.compose.foundation.rememberScrollState\nimport androidx.compose.foundation.shape.RoundedCornerShape\nimport androidx.compose.foundation.verticalScroll\nimport androidx.compose.material3.Button\nimport androidx.compose.material3.ButtonDefaults\nimport androidx.compose.material3.CircularProgressIndicator\nimport androidx.compose.material3.OutlinedTextField\nimport androidx.compose.material3.RadioButton\nimport androidx.compose.material3.Slider\nimport androidx.compose.material3.SliderDefaults\nimport androidx.compose.material3.Text\nimport androidx.compose.runtime.Composable\nimport androidx.compose.runtime.DisposableEffect\nimport androidx.compose.runtime.getValue\nimport androidx.compose.runtime.mutableLongStateOf\nimport androidx.compose.runtime.mutableStateOf\nimport androidx.compose.runtime.remember\nimport androidx.compose.runtime.setValue\nimport androidx.compose.ui.Alignment\nimport androidx.compose.ui.Modifier\nimport androidx.compose.ui.draw.clip\nimport androidx.compose.ui.graphics.Path\nimport androidx.compose.ui.graphics.StrokeCap\nimport androidx.compose.ui.graphics.StrokeJoin\nimport androidx.compose.ui.graphics.drawscope.Stroke\nimport androidx.compose.ui.graphics.drawscope.scale\nimport androidx.compose.ui.graphics.Color\nimport androidx.compose.ui.platform.LocalContext\nimport androidx.compose.ui.text.font.FontWeight\nimport androidx.compose.ui.text.TextStyle\nimport androidx.compose.ui.unit.dp\nimport androidx.compose.ui.unit.sp\nimport androidx.media3.transformer.Transformer\nimport java.util.Locale\nimport kotlin.concurrent.thread\n\nprivate enum class MediaTool { VIDEO_TO_AUDIO, TRIM_MEDIA }\nprivate const val MIN_TRIM_MS = 500L\n\n@Composable\nfun ToolsScreen() {\n    val context = LocalContext.current\n    val processor = remember(context) { MediaToolProcessor(context) }\n    val mainHandler = remember { Handler(Looper.getMainLooper()) }\n\n    var selectedTool by remember { mutableStateOf<MediaTool?>(null) }\n    var showDownloadMedia by remember { mutableStateOf(false) }\n    val downloadPreferences = remember(context) {\n        context.getSharedPreferences(\"mintplay_download_settings\", Context.MODE_PRIVATE)\n    }\n    var downloadVideoSegments by remember {\n        mutableStateOf(downloadPreferences.getBoolean(\"download_video_segments\", false))\n    }\n    var downloadLink by remember { mutableStateOf(\"\") }\n    var selectedDownloadQuality by remember {\n        mutableStateOf(downloadPreferences.getString(\"download_quality\", null))\n    }\n    var sourceUri by remember { mutableStateOf<Uri?>(null) }\n    var sourceName by remember { mutableStateOf<String?>(null) }\n    var sourceIsAudio by remember { mutableStateOf(false) }\n    var durationMs by remember { mutableLongStateOf(0L) }\n    var trimStartMs by remember { mutableLongStateOf(0L) }\n    var trimEndMs by remember { mutableLongStateOf(0L) }\n    var processing by remember { mutableStateOf(false) }\n    var statusMessage by remember { mutableStateOf<String?>(null) }\n    var errorMessage by remember { mutableStateOf<String?>(null) }\n    var activeTransformer by remember { mutableStateOf<Transformer?>(null) }\n\n    DisposableEffect(Unit) {\n        onDispose { activeTransformer?.cancel() }\n    }\n\n    val finishExport: (Result<Unit>) -> Unit = { result ->\n        processing = false\n        activeTransformer = null\n        result.onSuccess {\n            statusMessage = \"Saved successfully.\"\n            errorMessage = null\n        }.onFailure { error ->\n            statusMessage = null\n            errorMessage = \"Couldn't finish: ${error.message ?: \"unsupported media or codec\"}\"\n        }\n    }\n\n    fun startExport(\n        destinationUri: Uri,\n        removeVideo: Boolean,\n        outputIsAudio: Boolean,\n        startMs: Long? = null,\n        endMs: Long? = null\n    ) {\n        val source = sourceUri ?: return\n        processing = true\n        statusMessage = \"Processing media…\"\n        errorMessage = null\n        try {\n            activeTransformer = processor.export(\n                sourceUri = source,\n                destinationUri = destinationUri,\n                removeVideo = removeVideo,\n                outputIsAudio = outputIsAudio,\n                startMs = startMs,\n                endMs = endMs,\n                onFinished = finishExport\n            )\n        } catch (exception: Exception) {\n            processing = false\n            activeTransformer = null\n            statusMessage = null\n            errorMessage = \"Couldn't start: ${exception.message ?: \"unsupported media\"}\"\n        }\n    }\n\n    val extractOutputLauncher = rememberLauncherForActivityResult(\n        ActivityResultContracts.CreateDocument(\"*/*\")\n    ) { destination ->\n        if (destination != null) startExport(destination, removeVideo = true, outputIsAudio = true)\n    }\n\n    val trimAudioOutputLauncher = rememberLauncherForActivityResult(\n        ActivityResultContracts.CreateDocument(\"*/*\")\n    ) { destination ->\n        if (destination != null) {\n            startExport(\n                destination, removeVideo = false, outputIsAudio = true,\n                startMs = trimStartMs, endMs = trimEndMs\n            )\n        }\n    }\n\n    val trimVideoOutputLauncher = rememberLauncherForActivityResult(\n        ActivityResultContracts.CreateDocument(\"*/*\")\n    ) { destination ->\n        if (destination != null) {\n            startExport(\n                destination, removeVideo = false, outputIsAudio = false,\n                startMs = trimStartMs, endMs = trimEndMs\n            )\n        }\n    }\n\n    val inputLauncher = rememberLauncherForActivityResult(\n        ActivityResultContracts.OpenDocument()\n    ) { uri ->\n        if (uri != null) {\n            val mime = context.contentResolver.getType(uri).orEmpty()\n            val name = queryDisplayName(context, uri)\n            val extension = name.substringAfterLast('.', \"\").lowercase(Locale.ROOT)\n            val audio = mime.startsWith(\"audio/\") ||\n                extension in setOf(\"mp3\", \"m4a\", \"aac\", \"wav\", \"ogg\", \"flac\", \"opus\")\n            val video = mime.startsWith(\"video/\") ||\n                extension in setOf(\"mp4\", \"mkv\", \"webm\", \"mov\", \"3gp\", \"avi\", \"m4v\")\n\n            if (selectedTool == MediaTool.VIDEO_TO_AUDIO && !video) {\n                sourceUri = null\n                sourceName = null\n                durationMs = 0L\n                errorMessage = \"Choose a video file that contains an audio track.\"\n            } else if (!audio && !video) {\n                sourceUri = null\n                sourceName = null\n                durationMs = 0L\n                errorMessage = \"Choose a supported audio or video file.\"\n            } else {\n                runCatching {\n                    context.contentResolver.takePersistableUriPermission(\n                        uri,\n                        Intent.FLAG_GRANT_READ_URI_PERMISSION\n                    )\n                }\n                sourceUri = uri\n                sourceName = name\n                sourceIsAudio = audio\n                durationMs = 0L\n                trimStartMs = 0L\n                trimEndMs = 0L\n                statusMessage = null\n                errorMessage = null\n\n                thread(name = \"MintPlayReadDuration\") {\n                    val duration = runCatching {\n                        val retriever = MediaMetadataRetriever()\n                        try {\n                            retriever.setDataSource(context, uri)\n                            retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)\n                                ?.toLongOrNull() ?: 0L\n                        } finally {\n                            retriever.release()\n                        }\n                    }.getOrDefault(0L)\n\n                    mainHandler.post {\n                        durationMs = duration\n                        trimStartMs = 0L\n                        trimEndMs = duration\n                        if (duration <= 0L) {\n                            errorMessage = \"MintPlay couldn't read this file's duration.\"\n                        }\n                    }\n                }\n            }\n        }\n    }\n\n    Column(\n        modifier = Modifier.fillMaxSize()\n            .verticalScroll(rememberScrollState())\n            .padding(horizontal = 16.dp, vertical = 12.dp),\n        verticalArrangement = Arrangement.spacedBy(12.dp)\n    ) {\n        if (showDownloadMedia) {\n            Row(\n                modifier = Modifier.fillMaxWidth().padding(bottom = 2.dp),\n                verticalAlignment = Alignment.CenterVertically,\n                horizontalArrangement = Arrangement.spacedBy(10.dp)\n            ) {\n                Text(\n                    \"‹\", color = Accent, fontSize = 30.sp,\n                    modifier = Modifier.clickable { showDownloadMedia = false }\n                )\n                Column {\n                    Text(\"Download Media\", color = PrimaryText, fontSize = 22.sp, fontWeight = FontWeight.Bold)\n                    Text(\"Download video and audio from supported links.\", color = SecondaryText, fontSize = 13.sp)\n                }\n            }\n            SettingsSwitchRow(\n                title = \"Download Video Segments\",\n                subtitle = \"Enable downloading selected sections of a video.\",\n                checked = downloadVideoSegments,\n                onCheckedChange = { enabled ->\n                    downloadVideoSegments = enabled\n                    downloadPreferences.edit()\n                        .putBoolean(\"download_video_segments\", enabled)\n                        .apply()\n                },\n                showDivider = false\n            )\n            if (!downloadVideoSegments) {\n                Column(\n                    modifier = Modifier.fillMaxWidth(),\n                    verticalArrangement = Arrangement.spacedBy(6.dp)\n                ) {\n                    Text(\n                        text = \"Video link\",\n                        color = PrimaryText,\n                        fontSize = 14.sp,\n                        fontWeight = FontWeight.SemiBold\n                    )\n                    OutlinedTextField(\n                        value = downloadLink,\n                        onValueChange = { downloadLink = it },\n                        modifier = Modifier.fillMaxWidth(),\n                        singleLine = true,\n                        placeholder = { Text(\"put video link here\", color = SecondaryText) },\n                        textStyle = TextStyle(color = PrimaryText, fontSize = 15.sp),\n                        shape = RoundedCornerShape(8.dp),\n                        colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(\n                            focusedBorderColor = Accent,\n                            unfocusedBorderColor = Accent,\n                            cursorColor = Accent,\n                            focusedTextColor = PrimaryText,\n                            unfocusedTextColor = PrimaryText\n                        )\n                    )\n                }\n                Text(\n                    text = \"YouTube, Facebook, Instagram, twitter(X) and tiktok links are supposed\",\n                    color = PrimaryText,\n                    fontWeight = FontWeight.Bold,\n                    fontSize = 13.sp\n                )\n\n                Column(\n                    modifier = Modifier.fillMaxWidth()\n                        .clip(RoundedCornerShape(16.dp))\n                        .background(NavBackground)\n                        .padding(14.dp),\n                    verticalArrangement = Arrangement.spacedBy(6.dp)\n                ) {\n                    Text(\"Video preview\", color = PrimaryText, fontWeight = FontWeight.SemiBold)\n                    Box(\n                        modifier = Modifier.fillMaxWidth()\n                            .height(150.dp)\n                            .clip(RoundedCornerShape(12.dp))\n                            .background(Background),\n                        contentAlignment = Alignment.Center\n                    ) {\n                        Text(\"Video thumbnail and name will appear here\", color = SecondaryText, fontSize = 13.sp)\n                    }\n                }\n\n                Column(\n                    modifier = Modifier.fillMaxWidth()\n                        .clip(RoundedCornerShape(16.dp))\n                        .background(NavBackground)\n                        .padding(14.dp),\n                    verticalArrangement = Arrangement.spacedBy(2.dp)\n                ) {\n                    Text(\"Quality\", color = PrimaryText, fontWeight = FontWeight.SemiBold)\n                    listOf(\"144p\" to \"144p\", \"1080p\" to \"1080p\", \"audio\" to \"Download as audio\").forEach { (value, label) ->\n                        Row(\n                            modifier = Modifier.fillMaxWidth().clickable {\n                                selectedDownloadQuality = value\n                                downloadPreferences.edit().putString(\"download_quality\", value).apply()\n                            },\n                            verticalAlignment = Alignment.CenterVertically\n                        ) {\n                            RadioButton(\n                                selected = selectedDownloadQuality == value,\n                                onClick = {\n                                    selectedDownloadQuality = value\n                                    downloadPreferences.edit().putString(\"download_quality\", value).apply()\n                                }\n                            )\n                            Text(label, color = PrimaryText, fontSize = 14.sp)\n                        }\n                    }\n                }\n\n                Column(\n                    modifier = Modifier.fillMaxWidth()\n                        .clip(RoundedCornerShape(16.dp))\n                        .background(NavBackground)\n                        .padding(14.dp),\n                    verticalArrangement = Arrangement.spacedBy(5.dp)\n                ) {\n                    Text(\"Download path\", color = PrimaryText, fontWeight = FontWeight.SemiBold)\n                    Text(\"Previously selected download folder will appear here\", color = SecondaryText, fontSize = 13.sp)\n                }\n\n                Button(\n                    onClick = { },\n                    enabled = downloadLink.isNotBlank() && selectedDownloadQuality != null,\n                    modifier = Modifier.fillMaxWidth(),\n                    colors = ButtonDefaults.buttonColors(\n                        containerColor = Accent,\n                        contentColor = Background,\n                        disabledContainerColor = NavBackground,\n                        disabledContentColor = SecondaryText\n                    )\n                ) {\n                    Text(\"Download\", fontWeight = FontWeight.Bold)\n                }\n            }\n        } else if (selectedTool == null) {\n            Text(\"Tools\", color = PrimaryText, fontSize = 25.sp, fontWeight = FontWeight.Bold)\n            Text(\"Simple ways to work with your media.\", color = SecondaryText, fontSize = 14.sp)\n            Spacer(Modifier.height(4.dp))\n\n            ToolCard(\"♫\", \"Video to Audio\", \"Extract the soundtrack from a video and save it as an audio file.\") {\n                selectedTool = MediaTool.VIDEO_TO_AUDIO\n                sourceUri = null\n                sourceName = null\n                durationMs = 0L\n                statusMessage = null\n                errorMessage = null\n            }\n            ToolCard(\"✂\", \"Trim Media\", \"Choose a start and end point, then save just that section.\") {\n                selectedTool = MediaTool.TRIM_MEDIA\n                sourceUri = null\n                sourceName = null\n                durationMs = 0L\n                trimStartMs = 0L\n                trimEndMs = 0L\n                statusMessage = null\n                errorMessage = null\n            }\n            ToolCard(\"DOWNLOAD_ICON\", \"Download Media\", \"Download video and audio from supported links.\") {\n                showDownloadMedia = true\n            }\n        } else {\n            Row(\n                modifier = Modifier.fillMaxWidth().padding(bottom = 2.dp),\n                verticalAlignment = Alignment.CenterVertically,\n                horizontalArrangement = Arrangement.spacedBy(10.dp)\n            ) {\n                Text(\n                    \"‹\", color = Accent, fontSize = 30.sp,\n                    modifier = Modifier.clickable {\n                        activeTransformer?.cancel()\n                        activeTransformer = null\n                        processing = false\n                        selectedTool = null\n                        sourceUri = null\n                        sourceName = null\n                        statusMessage = null\n                        errorMessage = null\n                    }\n                )\n                Column {\n                    Text(\n                        if (selectedTool == MediaTool.VIDEO_TO_AUDIO) \"Video to Audio\" else \"Trim Media\",\n                        color = PrimaryText, fontSize = 22.sp, fontWeight = FontWeight.Bold\n                    )\n                    Text(\n                        if (selectedTool == MediaTool.VIDEO_TO_AUDIO) {\n                            \"Keep the sound. Leave the video behind.\"\n                        } else \"Keep only the section you need.\",\n                        color = SecondaryText, fontSize = 13.sp\n                    )\n                }\n            }\n\n            if (selectedTool == MediaTool.VIDEO_TO_AUDIO) {\n                InfoPanel(\"Output format\", \"M4A audio · AAC codec\")\n                Text(\n                    \"M4A/AAC uses Android's built-in encoder, keeping MintPlay lighter than bundling a large MP3 engine.\",\n                    color = SecondaryText, fontSize = 12.sp\n                )\n            }\n\n            if (sourceUri == null) {\n                InfoPanel(\n                    \"Choose a file\",\n                    if (selectedTool == MediaTool.VIDEO_TO_AUDIO) {\n                        \"Select a video with an audio track.\"\n                    } else \"Select a video or audio file.\"\n                )\n            } else {\n                InfoPanel(\n                    sourceName ?: \"Selected media\",\n                    if (durationMs > 0L) {\n                        formatToolTime(durationMs) + if (sourceIsAudio) \" · Audio\" else \" · Video\"\n                    } else \"Reading file information…\"\n                )\n            }\n\n            if (selectedTool == MediaTool.TRIM_MEDIA && durationMs >= 1000L) {\n                Column(\n                    modifier = Modifier.fillMaxWidth()\n                        .clip(RoundedCornerShape(16.dp))\n                        .background(NavBackground)\n                        .padding(14.dp),\n                    verticalArrangement = Arrangement.spacedBy(6.dp)\n                ) {\n                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {\n                        Text(\"Start\", color = SecondaryText, fontSize = 13.sp)\n                        Text(formatToolTime(trimStartMs), color = Accent, fontWeight = FontWeight.SemiBold)\n                    }\n                    Slider(\n                        value = trimStartMs.toFloat(),\n                        onValueChange = { trimStartMs = it.toLong().coerceAtMost((trimEndMs - MIN_TRIM_MS).coerceAtLeast(0L)) },\n                        valueRange = 0f..(durationMs - MIN_TRIM_MS).toFloat(),\n                        enabled = !processing,\n                        colors = SliderDefaults.colors(thumbColor = Accent, activeTrackColor = Accent, inactiveTrackColor = Inactive)\n                    )\n                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {\n                        Text(\"End\", color = SecondaryText, fontSize = 13.sp)\n                        Text(formatToolTime(trimEndMs), color = Accent, fontWeight = FontWeight.SemiBold)\n                    }\n                    Slider(\n                        value = trimEndMs.toFloat(),\n                        onValueChange = { trimEndMs = it.toLong().coerceAtLeast(trimStartMs + MIN_TRIM_MS).coerceAtMost(durationMs) },\n                        valueRange = (trimStartMs + MIN_TRIM_MS).toFloat()..durationMs.toFloat(),\n                        enabled = !processing,\n                        colors = SliderDefaults.colors(thumbColor = Accent, activeTrackColor = Accent, inactiveTrackColor = Inactive)\n                    )\n                    Text(\n                        \"Selected length: ${formatToolTime((trimEndMs - trimStartMs).coerceAtLeast(0L))}\",\n                        color = SecondaryText, fontSize = 12.sp\n                    )\n                }\n            } else if (selectedTool == MediaTool.TRIM_MEDIA && sourceUri != null && durationMs in 1L..999L) {\n                InfoPanel(\"File is too short\", \"Choose a file at least one second long to trim.\")\n            }\n\n            Button(\n                onClick = {\n                    inputLauncher.launch(\n                        if (selectedTool == MediaTool.VIDEO_TO_AUDIO) {\n                            arrayOf(\"video/*\")\n                        } else arrayOf(\"video/*\", \"audio/*\")\n                    )\n                },\n                enabled = !processing,\n                modifier = Modifier.fillMaxWidth(),\n                colors = ButtonDefaults.buttonColors(\n                    containerColor = NavBackground, contentColor = PrimaryText,\n                    disabledContainerColor = NavBackground, disabledContentColor = SecondaryText\n                )\n            ) {\n                Text(if (sourceUri == null) \"Choose file\" else \"Choose another file\")\n            }\n\n            Button(\n                onClick = {\n                    val name = sourceName ?: \"MintPlay\"\n                    val baseName = name.substringBeforeLast('.', name).ifBlank { \"MintPlay\" }\n                    if (selectedTool == MediaTool.VIDEO_TO_AUDIO) {\n                        extractOutputLauncher.launch(\"${baseName}_audio.m4a\")\n                    } else if (sourceIsAudio) {\n                        trimAudioOutputLauncher.launch(\"${baseName}_trimmed.m4a\")\n                    } else {\n                        trimVideoOutputLauncher.launch(\"${baseName}_trimmed.mp4\")\n                    }\n                },\n                enabled = sourceUri != null && !processing &&\n                    (selectedTool == MediaTool.VIDEO_TO_AUDIO ||\n                        (durationMs >= 1000L && trimStartMs < trimEndMs)),\n                modifier = Modifier.fillMaxWidth(),\n                colors = ButtonDefaults.buttonColors(\n                    containerColor = Accent, contentColor = Background,\n                    disabledContainerColor = NavBackground, disabledContentColor = SecondaryText\n                )\n            ) {\n                Text(\n                    when {\n                        processing -> \"Processing…\"\n                        selectedTool == MediaTool.VIDEO_TO_AUDIO -> \"Extract audio\"\n                        else -> \"Save trimmed media\"\n                    },\n                    fontWeight = FontWeight.Bold\n                )\n            }\n\n            if (processing) {\n                Row(\n                    modifier = Modifier.fillMaxWidth(),\n                    horizontalArrangement = Arrangement.Center,\n                    verticalAlignment = Alignment.CenterVertically\n                ) {\n                    CircularProgressIndicator(color = Accent, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)\n                    Text(\n                        \"This can take a while for large files.\",\n                        color = SecondaryText, fontSize = 12.sp,\n                        modifier = Modifier.padding(start = 10.dp)\n                    )\n                }\n            }\n            statusMessage?.let { Text(it, color = Accent, fontSize = 13.sp) }\n            errorMessage?.let { Text(it, color = Color(0xFFFF7777), fontSize = 13.sp) }\n        }\n    }\n}\n\n@Composable\nprivate fun ToolCard(\n    symbol: String,\n    title: String,\n    description: String,\n    onClick: () -> Unit\n) {\n    Row(\n        modifier = Modifier.fillMaxWidth()\n            .clip(RoundedCornerShape(18.dp))\n            .background(NavBackground)\n            .clickable(onClick = onClick)\n            .padding(16.dp),\n        verticalAlignment = Alignment.CenterVertically,\n        horizontalArrangement = Arrangement.spacedBy(14.dp)\n    ) {\n        Box(\n            modifier = Modifier.size(52.dp)\n                .clip(RoundedCornerShape(15.dp))\n                .background(Accent.copy(alpha = 0.13f)),\n            contentAlignment = Alignment.Center\n        ) {\n            if (symbol == \"DOWNLOAD_ICON\") {\n                Canvas(modifier = Modifier.size(30.dp)) {\n                    scale(size.width / 512f, size.height / 512f, pivot = androidx.compose.ui.geometry.Offset.Zero) {\n                        val iconPath = Path().apply {\n                            moveTo(256f, 64f)\n                            lineTo(256f, 318f)\n                            moveTo(160f, 226f)\n                            lineTo(256f, 322f)\n                            lineTo(352f, 226f)\n                            moveTo(72f, 346f)\n                            lineTo(72f, 400f)\n                            cubicTo(72f, 422.1f, 89.9f, 440f, 112f, 440f)\n                            lineTo(400f, 440f)\n                            cubicTo(422.1f, 440f, 440f, 422.1f, 440f, 400f)\n                            lineTo(440f, 346f)\n                        }\n                        drawPath(\n                            path = iconPath,\n                            color = Accent,\n                            style = Stroke(width = 40f, cap = StrokeCap.Round, join = StrokeJoin.Round)\n                        )\n                    }\n                }\n            } else {\n                Text(symbol, color = Accent, fontSize = 27.sp, fontWeight = FontWeight.Medium)\n            }\n        }\n        Column(Modifier.weight(1f)) {\n            Text(title, color = PrimaryText, fontSize = 16.sp, fontWeight = FontWeight.Bold)\n            Text(description, color = SecondaryText, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp))\n        }\n        Text(\"›\", color = SecondaryText, fontSize = 25.sp)\n    }\n}\n\n@Composable\nprivate fun InfoPanel(title: String, detail: String) {\n    Column(\n        modifier = Modifier.fillMaxWidth()\n            .clip(RoundedCornerShape(15.dp))\n            .background(NavBackground)\n            .padding(14.dp),\n        verticalArrangement = Arrangement.spacedBy(5.dp)\n    ) {\n        Text(title, color = PrimaryText, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)\n        Text(detail, color = SecondaryText, fontSize = 13.sp)\n    }\n}\n\nprivate fun queryDisplayName(context: Context, uri: Uri): String =\n    runCatching {\n        context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)\n            ?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }\n    }.getOrNull() ?: \"Selected media\"\n\nprivate fun formatToolTime(milliseconds: Long): String {\n    val seconds = milliseconds.coerceAtLeast(0L) / 1000L\n    val hours = seconds / 3600L\n    val minutes = (seconds % 3600L) / 60L\n    val remainingSeconds = seconds % 60L\n    return if (hours > 0L) {\n        String.format(Locale.ROOT, \"%d:%02d:%02d\", hours, minutes, remainingSeconds)\n    } else {\n        String.format(Locale.ROOT, \"%02d:%02d\", minutes, remainingSeconds)\n    }\n}\n\n\n","stderr":"","error":"","sandbox_id_suffix":"65ec","session":{"id":"held","instructions":"REQUIRED: Pass session_id \"held\" in ALL subsequent meta tool calls for this workflow."}},"error":null,"log_id":"log_vRw0SofgBkvV"}
+package com.mint.play
+
+import android.content.Context
+import android.content.Intent
+import android.media.MediaMetadataRetriever
+import android.net.Uri
+import android.os.Handler
+import android.os.Looper
+import android.provider.OpenableColumns
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.media3.transformer.Transformer
+import java.util.Locale
+import kotlin.concurrent.thread
+
+private enum class MediaTool { VIDEO_TO_AUDIO, TRIM_MEDIA }
+private const val MIN_TRIM_MS = 500L
+
+@Composable
+fun ToolsScreen() {
+    val context = LocalContext.current
+    val processor = remember(context) { MediaToolProcessor(context) }
+    val mainHandler = remember { Handler(Looper.getMainLooper()) }
+
+    var selectedTool by remember { mutableStateOf<MediaTool?>(null) }
+    var showDownloadMedia by remember { mutableStateOf(false) }
+    val downloadPreferences = remember(context) {
+        context.getSharedPreferences("mintplay_download_settings", Context.MODE_PRIVATE)
+    }
+    var downloadVideoSegments by remember {
+        mutableStateOf(downloadPreferences.getBoolean("download_video_segments", false))
+    }
+    var downloadLink by remember { mutableStateOf("") }
+    var selectedDownloadQuality by remember {
+        mutableStateOf(downloadPreferences.getString("download_quality", null))
+    }
+    var sourceUri by remember { mutableStateOf<Uri?>(null) }
+    var sourceName by remember { mutableStateOf<String?>(null) }
+    var sourceIsAudio by remember { mutableStateOf(false) }
+    var durationMs by remember { mutableLongStateOf(0L) }
+    var trimStartMs by remember { mutableLongStateOf(0L) }
+    var trimEndMs by remember { mutableLongStateOf(0L) }
+    var processing by remember { mutableStateOf(false) }
+    var statusMessage by remember { mutableStateOf<String?>(null) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var activeTransformer by remember { mutableStateOf<Transformer?>(null) }
+
+    DisposableEffect(Unit) {
+        onDispose { activeTransformer?.cancel() }
+    }
+
+    val finishExport: (Result<Unit>) -> Unit = { result ->
+        processing = false
+        activeTransformer = null
+        result.onSuccess {
+            statusMessage = "Saved successfully."
+            errorMessage = null
+        }.onFailure { error ->
+            statusMessage = null
+            errorMessage = "Couldn't finish: ${error.message ?: "unsupported media or codec"}"
+        }
+    }
+
+    fun startExport(
+        destinationUri: Uri,
+        removeVideo: Boolean,
+        outputIsAudio: Boolean,
+        startMs: Long? = null,
+        endMs: Long? = null
+    ) {
+        val source = sourceUri ?: return
+        processing = true
+        statusMessage = "Processing media…"
+        errorMessage = null
+        try {
+            activeTransformer = processor.export(
+                sourceUri = source,
+                destinationUri = destinationUri,
+                removeVideo = removeVideo,
+                outputIsAudio = outputIsAudio,
+                startMs = startMs,
+                endMs = endMs,
+                onFinished = finishExport
+            )
+        } catch (exception: Exception) {
+            processing = false
+            activeTransformer = null
+            statusMessage = null
+            errorMessage = "Couldn't start: ${exception.message ?: "unsupported media"}"
+        }
+    }
+
+    val extractOutputLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("*/*")
+    ) { destination ->
+        if (destination != null) startExport(destination, removeVideo = true, outputIsAudio = true)
+    }
+
+    val trimAudioOutputLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("*/*")
+    ) { destination ->
+        if (destination != null) {
+            startExport(
+                destination, removeVideo = false, outputIsAudio = true,
+                startMs = trimStartMs, endMs = trimEndMs
+            )
+        }
+    }
+
+    val trimVideoOutputLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("*/*")
+    ) { destination ->
+        if (destination != null) {
+            startExport(
+                destination, removeVideo = false, outputIsAudio = false,
+                startMs = trimStartMs, endMs = trimEndMs
+            )
+        }
+    }
+
+    val inputLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            val mime = context.contentResolver.getType(uri).orEmpty()
+            val name = queryDisplayName(context, uri)
+            val extension = name.substringAfterLast('.', "").lowercase(Locale.ROOT)
+            val audio = mime.startsWith("audio/") ||
+                extension in setOf("mp3", "m4a", "aac", "wav", "ogg", "flac", "opus")
+            val video = mime.startsWith("video/") ||
+                extension in setOf("mp4", "mkv", "webm", "mov", "3gp", "avi", "m4v")
+
+            if (selectedTool == MediaTool.VIDEO_TO_AUDIO && !video) {
+                sourceUri = null
+                sourceName = null
+                durationMs = 0L
+                errorMessage = "Choose a video file that contains an audio track."
+            } else if (!audio && !video) {
+                sourceUri = null
+                sourceName = null
+                durationMs = 0L
+                errorMessage = "Choose a supported audio or video file."
+            } else {
+                runCatching {
+                    context.contentResolver.takePersistableUriPermission(
+                        uri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    )
+                }
+                sourceUri = uri
+                sourceName = name
+                sourceIsAudio = audio
+                durationMs = 0L
+                trimStartMs = 0L
+                trimEndMs = 0L
+                statusMessage = null
+                errorMessage = null
+
+                thread(name = "MintPlayReadDuration") {
+                    val duration = runCatching {
+                        val retriever = MediaMetadataRetriever()
+                        try {
+                            retriever.setDataSource(context, uri)
+                            retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+                                ?.toLongOrNull() ?: 0L
+                        } finally {
+                            retriever.release()
+                        }
+                    }.getOrDefault(0L)
+
+                    mainHandler.post {
+                        durationMs = duration
+                        trimStartMs = 0L
+                        trimEndMs = duration
+                        if (duration <= 0L) {
+                            errorMessage = "MintPlay couldn't read this file's duration."
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Column(
+        modifier = Modifier.fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        if (showDownloadMedia) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    "‹", color = Accent, fontSize = 30.sp,
+                    modifier = Modifier.clickable { showDownloadMedia = false }
+                )
+                Column {
+                    Text("Download Media", color = PrimaryText, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                    Text("Download video and audio from supported links.", color = SecondaryText, fontSize = 13.sp)
+                }
+            }
+            SettingsSwitchRow(
+                title = "Download Video Segments",
+                subtitle = "Enable downloading selected sections of a video.",
+                checked = downloadVideoSegments,
+                onCheckedChange = { enabled ->
+                    downloadVideoSegments = enabled
+                    downloadPreferences.edit()
+                        .putBoolean("download_video_segments", enabled)
+                        .apply()
+                },
+                showDivider = false
+            )
+            if (!downloadVideoSegments) {
+                OutlinedTextField(
+                    value = downloadLink,
+                    onValueChange = { downloadLink = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    label = { Text("Video link") },
+                    placeholder = { Text("Paste video link here") }
+                )
+
+                Column(
+                    modifier = Modifier.fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(NavBackground)
+                        .padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text("Video preview", color = PrimaryText, fontWeight = FontWeight.SemiBold)
+                    Box(
+                        modifier = Modifier.fillMaxWidth()
+                            .height(150.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Background),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("Video thumbnail and name will appear here", color = SecondaryText, fontSize = 13.sp)
+                    }
+                }
+
+                Column(
+                    modifier = Modifier.fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(NavBackground)
+                        .padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    Text("Quality", color = PrimaryText, fontWeight = FontWeight.SemiBold)
+                    listOf("144p" to "144p", "1080p" to "1080p", "audio" to "Download as audio").forEach { (value, label) ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth().clickable {
+                                selectedDownloadQuality = value
+                                downloadPreferences.edit().putString("download_quality", value).apply()
+                            },
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = selectedDownloadQuality == value,
+                                onClick = {
+                                    selectedDownloadQuality = value
+                                    downloadPreferences.edit().putString("download_quality", value).apply()
+                                }
+                            )
+                            Text(label, color = PrimaryText, fontSize = 14.sp)
+                        }
+                    }
+                }
+
+                Column(
+                    modifier = Modifier.fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(NavBackground)
+                        .padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(5.dp)
+                ) {
+                    Text("Download path", color = PrimaryText, fontWeight = FontWeight.SemiBold)
+                    Text("Previously selected download folder will appear here", color = SecondaryText, fontSize = 13.sp)
+                }
+
+                Button(
+                    onClick = { },
+                    enabled = downloadLink.isNotBlank() && selectedDownloadQuality != null,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Accent,
+                        contentColor = Background,
+                        disabledContainerColor = NavBackground,
+                        disabledContentColor = SecondaryText
+                    )
+                ) {
+                    Text("Download", fontWeight = FontWeight.Bold)
+                }
+            }
+        } else if (selectedTool == null) {
+            Text("Tools", color = PrimaryText, fontSize = 25.sp, fontWeight = FontWeight.Bold)
+            Text("Simple ways to work with your media.", color = SecondaryText, fontSize = 14.sp)
+            Spacer(Modifier.height(4.dp))
+
+            ToolCard("♫", "Video to Audio", "Extract the soundtrack from a video and save it as an audio file.") {
+                selectedTool = MediaTool.VIDEO_TO_AUDIO
+                sourceUri = null
+                sourceName = null
+                durationMs = 0L
+                statusMessage = null
+                errorMessage = null
+            }
+            ToolCard("✂", "Trim Media", "Choose a start and end point, then save just that section.") {
+                selectedTool = MediaTool.TRIM_MEDIA
+                sourceUri = null
+                sourceName = null
+                durationMs = 0L
+                trimStartMs = 0L
+                trimEndMs = 0L
+                statusMessage = null
+                errorMessage = null
+            }
+            ToolCard("DOWNLOAD_ICON", "Download Media", "Download video and audio from supported links.") {
+                showDownloadMedia = true
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    "‹", color = Accent, fontSize = 30.sp,
+                    modifier = Modifier.clickable {
+                        activeTransformer?.cancel()
+                        activeTransformer = null
+                        processing = false
+                        selectedTool = null
+                        sourceUri = null
+                        sourceName = null
+                        statusMessage = null
+                        errorMessage = null
+                    }
+                )
+                Column {
+                    Text(
+                        if (selectedTool == MediaTool.VIDEO_TO_AUDIO) "Video to Audio" else "Trim Media",
+                        color = PrimaryText, fontSize = 22.sp, fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        if (selectedTool == MediaTool.VIDEO_TO_AUDIO) {
+                            "Keep the sound. Leave the video behind."
+                        } else "Keep only the section you need.",
+                        color = SecondaryText, fontSize = 13.sp
+                    )
+                }
+            }
+
+            if (selectedTool == MediaTool.VIDEO_TO_AUDIO) {
+                InfoPanel("Output format", "M4A audio · AAC codec")
+                Text(
+                    "M4A/AAC uses Android's built-in encoder, keeping MintPlay lighter than bundling a large MP3 engine.",
+                    color = SecondaryText, fontSize = 12.sp
+                )
+            }
+
+            if (sourceUri == null) {
+                InfoPanel(
+                    "Choose a file",
+                    if (selectedTool == MediaTool.VIDEO_TO_AUDIO) {
+                        "Select a video with an audio track."
+                    } else "Select a video or audio file."
+                )
+            } else {
+                InfoPanel(
+                    sourceName ?: "Selected media",
+                    if (durationMs > 0L) {
+                        formatToolTime(durationMs) + if (sourceIsAudio) " · Audio" else " · Video"
+                    } else "Reading file information…"
+                )
+            }
+
+            if (selectedTool == MediaTool.TRIM_MEDIA && durationMs >= 1000L) {
+                Column(
+                    modifier = Modifier.fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(NavBackground)
+                        .padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Start", color = SecondaryText, fontSize = 13.sp)
+                        Text(formatToolTime(trimStartMs), color = Accent, fontWeight = FontWeight.SemiBold)
+                    }
+                    Slider(
+                        value = trimStartMs.toFloat(),
+                        onValueChange = { trimStartMs = it.toLong().coerceAtMost((trimEndMs - MIN_TRIM_MS).coerceAtLeast(0L)) },
+                        valueRange = 0f..(durationMs - MIN_TRIM_MS).toFloat(),
+                        enabled = !processing,
+                        colors = SliderDefaults.colors(thumbColor = Accent, activeTrackColor = Accent, inactiveTrackColor = Inactive)
+                    )
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("End", color = SecondaryText, fontSize = 13.sp)
+                        Text(formatToolTime(trimEndMs), color = Accent, fontWeight = FontWeight.SemiBold)
+                    }
+                    Slider(
+                        value = trimEndMs.toFloat(),
+                        onValueChange = { trimEndMs = it.toLong().coerceAtLeast(trimStartMs + MIN_TRIM_MS).coerceAtMost(durationMs) },
+                        valueRange = (trimStartMs + MIN_TRIM_MS).toFloat()..durationMs.toFloat(),
+                        enabled = !processing,
+                        colors = SliderDefaults.colors(thumbColor = Accent, activeTrackColor = Accent, inactiveTrackColor = Inactive)
+                    )
+                    Text(
+                        "Selected length: ${formatToolTime((trimEndMs - trimStartMs).coerceAtLeast(0L))}",
+                        color = SecondaryText, fontSize = 12.sp
+                    )
+                }
+            } else if (selectedTool == MediaTool.TRIM_MEDIA && sourceUri != null && durationMs in 1L..999L) {
+                InfoPanel("File is too short", "Choose a file at least one second long to trim.")
+            }
+
+            Button(
+                onClick = {
+                    inputLauncher.launch(
+                        if (selectedTool == MediaTool.VIDEO_TO_AUDIO) {
+                            arrayOf("video/*")
+                        } else arrayOf("video/*", "audio/*")
+                    )
+                },
+                enabled = !processing,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = NavBackground, contentColor = PrimaryText,
+                    disabledContainerColor = NavBackground, disabledContentColor = SecondaryText
+                )
+            ) {
+                Text(if (sourceUri == null) "Choose file" else "Choose another file")
+            }
+
+            Button(
+                onClick = {
+                    val name = sourceName ?: "MintPlay"
+                    val baseName = name.substringBeforeLast('.', name).ifBlank { "MintPlay" }
+                    if (selectedTool == MediaTool.VIDEO_TO_AUDIO) {
+                        extractOutputLauncher.launch("${baseName}_audio.m4a")
+                    } else if (sourceIsAudio) {
+                        trimAudioOutputLauncher.launch("${baseName}_trimmed.m4a")
+                    } else {
+                        trimVideoOutputLauncher.launch("${baseName}_trimmed.mp4")
+                    }
+                },
+                enabled = sourceUri != null && !processing &&
+                    (selectedTool == MediaTool.VIDEO_TO_AUDIO ||
+                        (durationMs >= 1000L && trimStartMs < trimEndMs)),
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Accent, contentColor = Background,
+                    disabledContainerColor = NavBackground, disabledContentColor = SecondaryText
+                )
+            ) {
+                Text(
+                    when {
+                        processing -> "Processing…"
+                        selectedTool == MediaTool.VIDEO_TO_AUDIO -> "Extract audio"
+                        else -> "Save trimmed media"
+                    },
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            if (processing) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    CircularProgressIndicator(color = Accent, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                    Text(
+                        "This can take a while for large files.",
+                        color = SecondaryText, fontSize = 12.sp,
+                        modifier = Modifier.padding(start = 10.dp)
+                    )
+                }
+            }
+            statusMessage?.let { Text(it, color = Accent, fontSize = 13.sp) }
+            errorMessage?.let { Text(it, color = Color(0xFFFF7777), fontSize = 13.sp) }
+        }
+    }
+}
+
+@Composable
+private fun ToolCard(
+    symbol: String,
+    title: String,
+    description: String,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(NavBackground)
+            .clickable(onClick = onClick)
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        Box(
+            modifier = Modifier.size(52.dp)
+                .clip(RoundedCornerShape(15.dp))
+                .background(Accent.copy(alpha = 0.13f)),
+            contentAlignment = Alignment.Center
+        ) {
+            if (symbol == "DOWNLOAD_ICON") {
+                Canvas(modifier = Modifier.size(30.dp)) {
+                    scale(size.width / 512f, size.height / 512f, pivot = androidx.compose.ui.geometry.Offset.Zero) {
+                        val iconPath = Path().apply {
+                            moveTo(256f, 64f)
+                            lineTo(256f, 318f)
+                            moveTo(160f, 226f)
+                            lineTo(256f, 322f)
+                            lineTo(352f, 226f)
+                            moveTo(72f, 346f)
+                            lineTo(72f, 400f)
+                            cubicTo(72f, 422.1f, 89.9f, 440f, 112f, 440f)
+                            lineTo(400f, 440f)
+                            cubicTo(422.1f, 440f, 440f, 422.1f, 440f, 400f)
+                            lineTo(440f, 346f)
+                        }
+                        drawPath(
+                            path = iconPath,
+                            color = Accent,
+                            style = Stroke(width = 40f, cap = StrokeCap.Round, join = StrokeJoin.Round)
+                        )
+                    }
+                }
+            } else {
+                Text(symbol, color = Accent, fontSize = 27.sp, fontWeight = FontWeight.Medium)
+            }
+        }
+        Column(Modifier.weight(1f)) {
+            Text(title, color = PrimaryText, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Text(description, color = SecondaryText, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp))
+        }
+        Text("›", color = SecondaryText, fontSize = 25.sp)
+    }
+}
+
+@Composable
+private fun InfoPanel(title: String, detail: String) {
+    Column(
+        modifier = Modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(15.dp))
+            .background(NavBackground)
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(5.dp)
+    ) {
+        Text(title, color = PrimaryText, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+        Text(detail, color = SecondaryText, fontSize = 13.sp)
+    }
+}
+
+private fun queryDisplayName(context: Context, uri: Uri): String =
+    runCatching {
+        context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+            ?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
+    }.getOrNull() ?: "Selected media"
+
+private fun formatToolTime(milliseconds: Long): String {
+    val seconds = milliseconds.coerceAtLeast(0L) / 1000L
+    val hours = seconds / 3600L
+    val minutes = (seconds % 3600L) / 60L
+    val remainingSeconds = seconds % 60L
+    return if (hours > 0L) {
+        String.format(Locale.ROOT, "%d:%02d:%02d", hours, minutes, remainingSeconds)
+    } else {
+        String.format(Locale.ROOT, "%02d:%02d", minutes, remainingSeconds)
+    }
+}
+
