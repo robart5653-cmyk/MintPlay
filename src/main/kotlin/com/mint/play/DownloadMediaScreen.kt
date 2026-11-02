@@ -42,8 +42,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.arthenica.ffmpegkit.FFmpegKit
 import com.arthenica.ffmpegkit.ReturnCode
+import com.chaquo.python.PyObject
+import com.chaquo.python.Python
 import dev.ffmpegkit_maintained.ytdlp.DownloadProgressCallback
-import dev.ffmpegkit_maintained.ytdlp.LogCallback
 import dev.ffmpegkit_maintained.ytdlp.YtDlp
 import dev.ffmpegkit_maintained.ytdlp.YtDlpRequest
 import java.io.File
@@ -114,18 +115,7 @@ fun DownloadMediaScreen(onBack: () -> Unit) {
         thread(name = "MintPlayFormatCheck") {
             try {
                 YtDlp.init(context.applicationContext)
-                val lines = java.util.concurrent.CopyOnWriteArrayList<String>()
-                val request = YtDlpRequest(url)
-                    .addOption("--no-playlist")
-                    .addOption("-F")
-                val response = YtDlp.executeDebug(
-                    request,
-                    LogCallback { _, message -> lines.add(message) },
-                    null
-                ).get()
-                check(response.isSuccess()) { "yt-dlp couldn't inspect this link (exit code ${response.exitCode})." }
-
-                val found = parseAvailableHeights(lines.toList())
+                val found = inspectAvailableHeights(url)
                 handler.post {
                     if (screenActive) {
                         checkingQualities = false
@@ -428,16 +418,28 @@ fun DownloadMediaScreen(onBack: () -> Unit) {
     }
 }
 
-private fun parseAvailableHeights(lines: List<String>): List<DownloadQuality> {
+private fun inspectAvailableHeights(url: String): List<DownloadQuality> {
+    val python = Python.getInstance()
+    val options = python.getBuiltins().callAttr("dict")
+    val optionMap = options.asMap()
+    optionMap[PyObject.fromJava("quiet")] = PyObject.fromJava(true)
+    optionMap[PyObject.fromJava("no_warnings")] = PyObject.fromJava(true)
+    optionMap[PyObject.fromJava("noplaylist")] = PyObject.fromJava(true)
+    optionMap[PyObject.fromJava("skip_download")] = PyObject.fromJava(true)
+
+    val downloader = python.getModule("yt_dlp").callAttr("YoutubeDL", options)
+    val info = downloader.callAttr("extract_info", url, false)
+    val formats = info.callAttr("get", "formats") ?: return emptyList()
     val heights = linkedSetOf<Int>()
-    val resolutionPattern = Regex("\\b(\\d{3,4})p\\b|\\b\\d{3,4}x(\\d{3,4})\\b")
-    for (line in lines) {
-        val match = resolutionPattern.find(line) ?: continue
-        val height = (match.groups[1]?.value ?: match.groups[2]?.value)?.toIntOrNull() ?: continue
-        if (height >= 144 && height <= 4320) heights.add(height)
+
+    for (format in formats.asList()) {
+        val height = format.callAttr("get", "height")?.toInt() ?: continue
+        if (height in 144..4320) heights.add(height)
     }
+
     return heights.sortedDescending().map { DownloadQuality(it) }
 }
+
 
 private fun readTreeName(context: Context, treeUri: Uri): String = runCatching {
     val documentUri = DocumentsContract.buildDocumentUriUsingTree(
