@@ -114,7 +114,7 @@ fun DownloadMediaScreen(onBack: () -> Unit) {
         thread(name = "MintPlayFormatCheck") {
             try {
                 YtDlp.init(context.applicationContext)
-                val lines = java.util.Collections.synchronizedList(mutableListOf<String>())
+                val lines = java.util.concurrent.CopyOnWriteArrayList<String>()
                 val request = YtDlpRequest(url)
                     .addOption("--no-playlist")
                     .addOption("-F")
