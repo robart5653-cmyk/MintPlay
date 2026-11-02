@@ -437,7 +437,9 @@ private fun inspectAvailableHeights(url: String): List<DownloadQuality> {
     // Use YouTube's TV client consistently for format inspection and downloading.
     val extractorArgs = python.getBuiltins().callAttr("dict")
     val youtubeArgs = python.getBuiltins().callAttr("dict")
-    youtubeArgs.asMap()[PyObject.fromJava("player_client")] = PyObject.fromJava(listOf("tv"))
+    val playerClients = python.getBuiltins().callAttr("list")
+    playerClients.callAttr("append", PyObject.fromJava("tv"))
+    youtubeArgs.asMap()[PyObject.fromJava("player_client")] = playerClients
     extractorArgs.asMap()[PyObject.fromJava("youtube")] = youtubeArgs
     optionMap[PyObject.fromJava("extractor_args")] = extractorArgs
 
