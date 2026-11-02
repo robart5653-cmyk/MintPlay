@@ -101,8 +101,8 @@ fun DownloadMediaScreen(onBack: () -> Unit) {
 
     fun inspectQualities() {
         val url = link.trim()
-        if (!url.startsWith("https://") && !url.startsWith("http://")) {
-            errorMessage = "Enter a valid video URL."
+        if (!isYouTubeUrl(url)) {
+            errorMessage = "Enter a valid YouTube video URL."
             return
         }
 
@@ -146,6 +146,10 @@ fun DownloadMediaScreen(onBack: () -> Unit) {
         val url = link.trim()
         val destinationTree = folderUri
         val height = selectedHeight
+        if (!isYouTubeUrl(url)) {
+            errorMessage = "Enter a valid YouTube video URL."
+            return
+        }
         if (height == null) {
             errorMessage = "Check the available qualities and choose one first."
             return
@@ -191,6 +195,7 @@ fun DownloadMediaScreen(onBack: () -> Unit) {
                         .addOption("--no-playlist")
                         .addOption("--newline")
                         .addOption("-f", "best[height<=${height}]")
+                        .addOption("--extractor-args", "youtube:player_client=tv")
                     val response = YtDlp.executeAsync(request, progressCallback("Downloading")).get()
                     check(response.isSuccess()) {
                         "The selected ${height}p quality isn't available as a combined video/audio file (yt-dlp exit code ${response.exitCode})."
@@ -210,6 +215,7 @@ fun DownloadMediaScreen(onBack: () -> Unit) {
                         .addOption("--no-playlist")
                         .addOption("--newline")
                         .addOption("-f", "bestvideo[height<=${height}]")
+                        .addOption("--extractor-args", "youtube:player_client=tv")
                     val videoResponse = YtDlp.executeAsync(videoRequest, progressCallback("Video")).get()
                     check(videoResponse.isSuccess()) { "Video stream download failed (yt-dlp exit code ${videoResponse.exitCode})." }
 
@@ -219,6 +225,7 @@ fun DownloadMediaScreen(onBack: () -> Unit) {
                         .addOption("--no-playlist")
                         .addOption("--newline")
                         .addOption("-f", "bestaudio")
+                        .addOption("--extractor-args", "youtube:player_client=tv")
                     val audioResponse = YtDlp.executeAsync(audioRequest, progressCallback("Audio")).get()
                     check(audioResponse.isSuccess()) { "Audio stream download failed (yt-dlp exit code ${audioResponse.exitCode})." }
 
@@ -306,7 +313,7 @@ fun DownloadMediaScreen(onBack: () -> Unit) {
                 focusedTextColor = PrimaryText,
                 unfocusedTextColor = PrimaryText
             ),
-            placeholder = { Text("Paste a video URL") }
+            placeholder = { Text("Paste a YouTube video URL") }
         )
 
         Button(
@@ -427,6 +434,13 @@ private fun inspectAvailableHeights(url: String): List<DownloadQuality> {
     optionMap[PyObject.fromJava("noplaylist")] = PyObject.fromJava(true)
     optionMap[PyObject.fromJava("skip_download")] = PyObject.fromJava(true)
 
+    // Use YouTube's TV client consistently for format inspection and downloading.
+    val extractorArgs = python.getBuiltins().callAttr("dict")
+    val youtubeArgs = python.getBuiltins().callAttr("dict")
+    youtubeArgs.asMap()[PyObject.fromJava("player_client")] = PyObject.fromJava(listOf("tv"))
+    extractorArgs.asMap()[PyObject.fromJava("youtube")] = youtubeArgs
+    optionMap[PyObject.fromJava("extractor_args")] = extractorArgs
+
     val downloader = python.getModule("yt_dlp").callAttr("YoutubeDL", options)
     val info = downloader.callAttr("extract_info", url, false)
     val formats = info.callAttr("get", "formats") ?: return emptyList()
@@ -440,6 +454,12 @@ private fun inspectAvailableHeights(url: String): List<DownloadQuality> {
     return heights.sortedDescending().map { DownloadQuality(it) }
 }
 
+
+private fun isYouTubeUrl(url: String): Boolean = runCatching {
+    val host = Uri.parse(url).host?.lowercase(Locale.ROOT) ?: return@runCatching false
+    host == "youtu.be" || host == "youtube.com" || host.endsWith(".youtube.com") ||
+        host == "youtube-nocookie.com" || host.endsWith(".youtube-nocookie.com")
+}.getOrDefault(false)
 
 private fun readTreeName(context: Context, treeUri: Uri): String = runCatching {
     val documentUri = DocumentsContract.buildDocumentUriUsingTree(
