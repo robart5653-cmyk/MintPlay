@@ -379,7 +379,9 @@ fun DownloadMediaScreen(onBack: () -> Unit) {
             modifier = Modifier.fillMaxWidth()
                 .clip(RoundedCornerShape(16.dp))
                 .background(NavBackground)
-                .clickable(enabled = !downloading) { folderPicker.launch(null) }
+                .clickable(enabled = !downloading) {
+    folderPicker.launch(null as Uri?)
+}
                 .padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(5.dp)
         ) {
