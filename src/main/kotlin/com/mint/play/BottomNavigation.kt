@@ -29,8 +29,6 @@ private data class NavItem(
 private val navItems = listOf(
     NavItem("Video", VideoIcon),
     NavItem("Music", MusicIcon),
-    NavItem("Downloader", DownloaderIcon),
-    NavItem("Downloads", DownloadsIcon),
     NavItem("Tools", ToolsIcon),
     NavItem("Settings", SettingsIcon)
 )

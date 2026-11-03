@@ -15,10 +15,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
@@ -48,7 +45,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.io.File
 import java.util.Locale
-import java.util.UUID
 import kotlin.concurrent.thread
 
 private data class DownloadQuality(val height: Int) {
@@ -56,7 +52,7 @@ private data class DownloadQuality(val height: Int) {
 }
 
 @Composable
-fun DownloadMediaScreen() {
+fun DownloadMediaScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val preferences = remember(context) {
         context.getSharedPreferences("mintplay_download_settings", Context.MODE_PRIVATE)
@@ -77,7 +73,9 @@ fun DownloadMediaScreen() {
     var clipEnd by remember { mutableStateOf("") }
     var selectedHeight by remember { mutableStateOf<Int?>(null) }
     var checkingQualities by remember { mutableStateOf(false) }
-    val downloading = DownloadTaskStore.tasks.any { it.isActive }
+    var downloading by remember { mutableStateOf(false) }
+    var progress by remember { mutableStateOf(0f) }
+    var progressLine by remember { mutableStateOf("") }
     var status by remember { mutableStateOf<String?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var screenActive by remember { mutableStateOf(true) }
@@ -189,9 +187,10 @@ fun DownloadMediaScreen() {
         }
         val cachedInfo = videoInfo
 
-        val taskId = UUID.randomUUID().toString()
-        DownloadTaskStore.add(DownloadTask(id = taskId, title = cachedInfo?.title ?: url))
-        status = "Download started. You can monitor it in the Downloads tab."
+        downloading = true
+        progress = 0f
+        progressLine = "Starting yt-dlp…"
+        status = null
         errorMessage = null
 
         thread(name = "MintPlayDownload") {
@@ -211,23 +210,26 @@ fun DownloadMediaScreen() {
                     cachedInfo = cachedInfo,
                     clip = clip,
                     onStatus = { message ->
-                        handler.post {
-                            DownloadTaskStore.updateStatus(taskId, message)
-                            if (screenActive) status = message
-                        }
+                        handler.post { if (screenActive) progressLine = message }
                     },
                     onProgress = { percent, line ->
-                        handler.post { DownloadTaskStore.updateProgress(taskId, percent, line) }
+                        handler.post {
+                            if (screenActive) {
+                                progress = percent.coerceIn(0f, 100f)
+                                progressLine = line
+                            }
+                        }
                     }
                 )
 
-                handler.post { DownloadTaskStore.updateStatus(taskId, "Saving to selected folder…") }
                 saveFileToTree(context, destinationTree, output)
                 taskDir.deleteRecursively()
 
                 handler.post {
-                    DownloadTaskStore.complete(taskId)
                     if (screenActive) {
+                        downloading = false
+                        progress = 100f
+                        progressLine = ""
                         status = "Downloaded: ${output.name}"
                         errorMessage = null
                     }
@@ -236,8 +238,9 @@ fun DownloadMediaScreen() {
                 taskDirectory?.deleteRecursively()
                 val reason = YoutubeDownloader.describe(exception)
                 handler.post {
-                    DownloadTaskStore.fail(taskId, reason)
                     if (screenActive) {
+                        downloading = false
+                        progressLine = ""
                         status = null
                         errorMessage = reason
                     }
@@ -247,11 +250,19 @@ fun DownloadMediaScreen() {
     }
 
     Column(
-        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Text("Downloader", color = PrimaryText, fontSize = 25.sp, fontWeight = FontWeight.Bold)
+        Row(
+            modifier = Modifier.fillMaxWidth()
+                .padding(bottom = 2.dp)
+                .clickable(enabled = !downloading && !checkingQualities, onClick = onBack),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text("‹", color = Accent, fontSize = 30.sp)
+            Text("Downloads", color = PrimaryText, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+        }
 
         Text("Video link", color = PrimaryText, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
         OutlinedTextField(
@@ -414,14 +425,23 @@ fun DownloadMediaScreen() {
             )
         ) {
             Text(
-                if (downloading) "Download in progress" else if (clipEnabled) "Download segment" else "Download selected quality",
+                if (downloading) "Downloading…" else if (clipEnabled) "Download segment" else "Download selected quality",
                 fontWeight = FontWeight.Bold
             )
         }
 
         if (downloading) {
-            Text("A download is running. Switch to Downloads to monitor it; it will keep running when you leave this tab.",
-                color = SecondaryText, fontSize = 12.sp)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                CircularProgressIndicator(color = Accent, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                Column(Modifier.weight(1f)) {
+                    Text("${progress.toInt()}%", color = Accent, fontWeight = FontWeight.SemiBold)
+                    Text(progressLine, color = SecondaryText, fontSize = 12.sp, maxLines = 2)
+                }
+            }
         }
         status?.let { Text(it, color = Accent, fontSize = 13.sp) }
         errorMessage?.let { Text(it, color = androidx.compose.ui.graphics.Color(0xFFFF7777), fontSize = 13.sp) }

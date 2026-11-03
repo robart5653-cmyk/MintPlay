@@ -196,27 +196,3 @@ internal val SettingsIcon = createIcon("Settings") {
         circle(cx = cx, cy = cy, r = 2.8f)
     }
 }
-
-/** Download arrow entering a tray: the download starter. */
-internal val DownloaderIcon = createIcon("Downloader") {
-    line {
-        moveTo(12f, 3f)
-        verticalLineTo(15f)
-        moveTo(7f, 10f)
-        lineTo(12f, 15f)
-        lineTo(17f, 10f)
-        moveTo(4f, 19f)
-        horizontalLineTo(20f)
-    }
-}
-
-/** Stacked progress lines: the active-download monitor. */
-internal val DownloadsIcon = createIcon("Downloads") {
-    line {
-        moveTo(4f, 6f); horizontalLineTo(20f)
-        moveTo(4f, 12f); horizontalLineTo(14f)
-        moveTo(4f, 18f); horizontalLineTo(11f)
-        moveTo(18f, 12f); verticalLineTo(20f)
-        moveTo(15f, 17f); lineTo(18f, 20f); lineTo(21f, 17f)
-    }
-}

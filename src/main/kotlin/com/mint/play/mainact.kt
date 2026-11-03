@@ -85,6 +85,7 @@ fun MyScreen(
     var selectedTab by remember { mutableIntStateOf(0) }
     var playerOpen by remember { mutableStateOf(false) }
     var showAudioPlayer by remember { mutableStateOf(false) }
+    var showDownloads by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val audioPlayerController = remember(context) { AudioPlayerController(context) }
     val configuration = LocalConfiguration.current
@@ -116,13 +117,16 @@ fun MyScreen(
                 else Modifier.windowInsetsPadding(WindowInsets.safeDrawing)
             )
     ) {
-        val audioPlayerVisible = showAudioPlayer && selectedTab == 1
+        if (showDownloads) {
+            DownloadsTab(onBack = { showDownloads = false })
+        } else {
+            val audioPlayerVisible = showAudioPlayer && selectedTab == 1
 
-        if (!playerOpen && !audioPlayerVisible) {
-            TopBar()
-        }
+            if (!playerOpen && !audioPlayerVisible) {
+                TopBar(onDownloadsClick = { showDownloads = true })
+            }
 
-        Column(
+            Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
@@ -165,11 +169,12 @@ fun MyScreen(
             )
         }
 
-        if (!playerOpen && !audioPlayerVisible) {
-            BottomNavigation(
-                selectedTab = selectedTab,
-                onTabSelected = { selectedTab = it }
-            )
+            if (!playerOpen && !audioPlayerVisible) {
+                BottomNavigation(
+                    selectedTab = selectedTab,
+                    onTabSelected = { selectedTab = it }
+                )
+            }
         }
     }
 }
@@ -179,5 +184,32 @@ fun MyScreen(
 fun MyScreenPreview() {
     MaterialTheme {
         MyScreen()
+    }
+}
+
+
+@Composable
+private fun DownloadsTab(onBack: () -> Unit) {
+    Column(modifier = Modifier.fillMaxSize()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onBack)
+                .padding(horizontal = 18.dp, vertical = 10.dp),
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+        ) {
+            androidx.compose.material3.Text(
+                "‹",
+                color = Accent,
+                fontSize = 30.sp,
+                fontWeight = FontWeight.Normal
+            )
+            androidx.compose.material3.Text(
+                " Downloading",
+                color = PrimaryText,
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
     }
 }

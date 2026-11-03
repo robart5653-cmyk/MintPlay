@@ -35,9 +35,7 @@ fun HomeScreen(
             onAudioPlayerVisibilityChanged = onAudioPlayerVisibilityChanged,
             onAudioSelected = onAudioSelected
         )
-        2 -> DownloadMediaScreen()
-        3 -> DownloadsScreen()
-        4 -> ToolsScreen()
+        2 -> ToolsScreen()
         else -> SettingsTabUI()
     }
 }
