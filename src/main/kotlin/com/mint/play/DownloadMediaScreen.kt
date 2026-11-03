@@ -254,18 +254,14 @@ fun DownloadMediaScreen(onBack: () -> Unit) {
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(bottom = 2.dp),
+            modifier = Modifier.fillMaxWidth()
+                .padding(bottom = 2.dp)
+                .clickable(enabled = !downloading && !checkingQualities, onClick = onBack),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Text(
-                "‹", color = Accent, fontSize = 30.sp,
-                modifier = Modifier.clickable(enabled = !downloading && !checkingQualities, onClick = onBack)
-            )
-            Column {
-                Text("Download Media", color = PrimaryText, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                Text("Choose a quality supported by the link.", color = SecondaryText, fontSize = 13.sp)
-            }
+            Text("‹", color = Accent, fontSize = 30.sp)
+            Text("Downloads", color = PrimaryText, fontSize = 22.sp, fontWeight = FontWeight.Bold)
         }
 
         Text("Video link", color = PrimaryText, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)

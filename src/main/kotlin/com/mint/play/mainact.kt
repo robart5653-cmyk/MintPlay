@@ -79,6 +79,7 @@ fun MyScreen(
     var selectedTab by remember { mutableIntStateOf(0) }
     var playerOpen by remember { mutableStateOf(false) }
     var showAudioPlayer by remember { mutableStateOf(false) }
+    var showDownloads by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val audioPlayerController = remember(context) { AudioPlayerController(context) }
     val configuration = LocalConfiguration.current
@@ -110,13 +111,16 @@ fun MyScreen(
                 else Modifier.windowInsetsPadding(WindowInsets.safeDrawing)
             )
     ) {
-        val audioPlayerVisible = showAudioPlayer && selectedTab == 1
+        if (showDownloads) {
+            DownloadMediaScreen(onBack = { showDownloads = false })
+        } else {
+            val audioPlayerVisible = showAudioPlayer && selectedTab == 1
 
-        if (!playerOpen && !audioPlayerVisible) {
-            TopBar()
-        }
+            if (!playerOpen && !audioPlayerVisible) {
+                TopBar(onDownloadsClick = { showDownloads = true })
+            }
 
-        Column(
+            Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
@@ -159,11 +163,12 @@ fun MyScreen(
             )
         }
 
-        if (!playerOpen && !audioPlayerVisible) {
-            BottomNavigation(
-                selectedTab = selectedTab,
-                onTabSelected = { selectedTab = it }
-            )
+            if (!playerOpen && !audioPlayerVisible) {
+                BottomNavigation(
+                    selectedTab = selectedTab,
+                    onTabSelected = { selectedTab = it }
+                )
+            }
         }
     }
 }
