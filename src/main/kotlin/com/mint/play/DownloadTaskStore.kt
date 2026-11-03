@@ -43,7 +43,8 @@ internal object DownloadTaskStore {
         return task.copy(
             downloadedBytes = downloaded,
             totalBytes = total,
-            eta = parseEta(task.rawProgressLine) ?: task.eta
+            eta = parseEta(task.rawProgressLine)
+                ?: if (task.rawProgressLine.contains("Segment", ignoreCase = true)) "ETA unavailable for segment" else task.eta
         )
     }
 

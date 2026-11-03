@@ -79,7 +79,8 @@ fun DownloadsScreen() {
                             Text("~${formatDownloadBytes(task.downloadedBytes)} / ${formatDownloadBytes(task.totalBytes)} (estimated)",
                                 color = PrimaryText, fontSize = 11.sp)
                         } else {
-                            Text("Size: calculating…", color = SecondaryText, fontSize = 11.sp)
+                            Text(if (task.status.contains("Segment", ignoreCase = true)) "Size unavailable for this segment" else "Size: calculating…",
+                                color = SecondaryText, fontSize = 11.sp)
                         }
                         Text(task.status, color = SecondaryText, fontSize = 10.sp, maxLines = 1)
                     }
