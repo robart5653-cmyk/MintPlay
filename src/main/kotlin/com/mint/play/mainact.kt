@@ -2,6 +2,7 @@ package com.mint.play
 
 import android.content.res.Configuration
 import android.os.Bundle
+import androidx.compose.foundation.layout.padding
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.core.view.WindowCompat
@@ -204,7 +205,7 @@ private fun DownloadsTab(onBack: () -> Unit) {
                 fontWeight = FontWeight.Normal
             )
             androidx.compose.material3.Text(
-                "Downloads",
+                " Downloading",
                 color = PrimaryText,
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold
