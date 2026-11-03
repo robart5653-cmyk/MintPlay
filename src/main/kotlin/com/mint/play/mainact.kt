@@ -211,5 +211,6 @@ private fun DownloadsTab(onBack: () -> Unit) {
                 fontWeight = FontWeight.Bold
             )
         }
+        DownloadMonitorCard()
     }
 }

@@ -188,6 +188,7 @@ fun DownloadMediaScreen(onBack: () -> Unit) {
         val cachedInfo = videoInfo
 
         downloading = true
+        DownloadMonitorState.begin(cachedInfo?.title ?: "YouTube video")
         progress = 0f
         progressLine = "Starting yt-dlp…"
         status = null
@@ -210,10 +211,14 @@ fun DownloadMediaScreen(onBack: () -> Unit) {
                     cachedInfo = cachedInfo,
                     clip = clip,
                     onStatus = { message ->
-                        handler.post { if (screenActive) progressLine = message }
+                        handler.post {
+                            DownloadMonitorState.updateStatus(message)
+                            if (screenActive) progressLine = message
+                        }
                     },
                     onProgress = { percent, line ->
                         handler.post {
+                            DownloadMonitorState.updateProgress(percent, line)
                             if (screenActive) {
                                 progress = percent.coerceIn(0f, 100f)
                                 progressLine = line
@@ -226,6 +231,7 @@ fun DownloadMediaScreen(onBack: () -> Unit) {
                 taskDir.deleteRecursively()
 
                 handler.post {
+                    DownloadMonitorState.complete()
                     if (screenActive) {
                         downloading = false
                         progress = 100f
@@ -238,6 +244,7 @@ fun DownloadMediaScreen(onBack: () -> Unit) {
                 taskDirectory?.deleteRecursively()
                 val reason = YoutubeDownloader.describe(exception)
                 handler.post {
+                    DownloadMonitorState.fail(reason)
                     if (screenActive) {
                         downloading = false
                         progressLine = ""
