@@ -6,7 +6,9 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.core.view.WindowCompat
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -25,6 +27,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
@@ -112,7 +117,7 @@ fun MyScreen(
             )
     ) {
         if (showDownloads) {
-            DownloadMediaScreen(onBack = { showDownloads = false })
+            DownloadsTab(onBack = { showDownloads = false })
         } else {
             val audioPlayerVisible = showAudioPlayer && selectedTab == 1
 
@@ -178,5 +183,32 @@ fun MyScreen(
 fun MyScreenPreview() {
     MaterialTheme {
         MyScreen()
+    }
+}
+
+
+@Composable
+private fun DownloadsTab(onBack: () -> Unit) {
+    Column(modifier = Modifier.fillMaxSize()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onBack)
+                .padding(horizontal = 18.dp, vertical = 10.dp),
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+        ) {
+            androidx.compose.material3.Text(
+                "‹",
+                color = Accent,
+                fontSize = 30.sp,
+                fontWeight = FontWeight.Normal
+            )
+            androidx.compose.material3.Text(
+                "Downloads",
+                color = PrimaryText,
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
     }
 }

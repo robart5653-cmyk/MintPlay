@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.weight
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -28,19 +29,33 @@ fun TopBar(onDownloadsClick: () -> Unit) {
             .padding(horizontal = 18.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        Text(
+            text = "Mint",
+            color = PrimaryText,
+            fontSize = 23.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 0.2.sp
+        )
+        Text(
+            text = "Play",
+            color = Color(0xFF4DD4AC),
+            fontSize = 23.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 0.2.sp
+        )
+
+        Spacer(modifier = Modifier.weight(1f))
+
         IconButton(
             onClick = onDownloadsClick,
             modifier = Modifier.size(36.dp)
         ) {
             Canvas(modifier = Modifier.size(22.dp)) {
-                val iconColor = PrimaryText
+                val iconColor = Accent
                 val strokeWidth = 1.8.dp.toPx()
                 val centerX = size.width / 2f
 
-                drawCircle(
-                    color = iconColor,
-                    style = Stroke(width = strokeWidth)
-                )
+                drawCircle(color = iconColor, style = Stroke(width = strokeWidth))
                 drawLine(
                     color = iconColor,
                     start = Offset(centerX, size.height * 0.23f),
@@ -71,22 +86,5 @@ fun TopBar(onDownloadsClick: () -> Unit) {
                 )
             }
         }
-
-        Spacer(modifier = Modifier.width(8.dp))
-
-        Text(
-            text = "Mint",
-            color = PrimaryText,
-            fontSize = 23.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 0.2.sp
-        )
-        Text(
-            text = "Play",
-            color = Color(0xFF4DD4AC),
-            fontSize = 23.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 0.2.sp
-        )
     }
 }
