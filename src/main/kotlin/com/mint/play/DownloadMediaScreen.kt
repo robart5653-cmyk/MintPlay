@@ -422,11 +422,12 @@ private fun inspectAvailableHeights(url: String): List<DownloadQuality> {
 }
 
 
-// Tried in order. null = let yt-dlp choose its own default YouTube clients.
-// android_vr is a fallback client that doesn't need a PO token.
+// Tried in order. The yt-dlp bundled in the library can be older than the release that
+// removed YouTube's broken default client, so android_vr (no PO token needed) goes first.
+// null = let yt-dlp choose its own default YouTube clients.
 private val clientAttempts: List<String?> = listOf(
-    null,
-    "youtube:player_client=android_vr"
+    "youtube:player_client=android_vr",
+    null
 )
 
 private fun downloadStream(
@@ -436,7 +437,7 @@ private fun downloadStream(
     format: String,
     progress: DownloadProgressCallback
 ): File {
-    var lastExitCode = -1
+    var lastError = "unknown error"
     for (client in clientAttempts) {
         // Clear leftovers from a previous attempt so a half-finished file is never reused.
         taskDir.listFiles()?.filter { it.name.startsWith("$prefix.") }?.forEach { it.delete() }
@@ -450,20 +451,25 @@ private fun downloadStream(
             .addOption("-f", format)
         if (client != null) request.addOption("--extractor-args", client)
 
-        val response = YtDlp.executeAsync(request, progress).get()
-        if (response.isSuccess()) {
-            val file = taskDir.listFiles()?.firstOrNull {
-                it.isFile && it.name.startsWith("$prefix.") &&
-                    !it.name.endsWith(".part") && !it.name.endsWith(".ytdl")
+        // The library may throw on a failed download instead of returning a failed
+        // response, so catch it here and fall through to the next client.
+        try {
+            val response = YtDlp.executeAsync(request, progress).get()
+            if (response.isSuccess()) {
+                val file = taskDir.listFiles()?.firstOrNull {
+                    it.isFile && it.name.startsWith("$prefix.") &&
+                        !it.name.endsWith(".part") && !it.name.endsWith(".ytdl")
+                }
+                if (file != null) return file
+                lastError = "yt-dlp finished but no $prefix file was created"
+            } else {
+                lastError = "yt-dlp exit code ${response.exitCode}"
             }
-            if (file != null) return file
+        } catch (exception: Exception) {
+            lastError = exception.cause?.message ?: exception.message ?: "unknown yt-dlp error"
         }
-        lastExitCode = response.exitCode
     }
-    error(
-        "The $prefix stream couldn't be downloaded (yt-dlp exit code $lastExitCode). " +
-            "YouTube may be rejecting the request (HTTP 403). Try again later or update the app."
-    )
+    error("The $prefix stream couldn't be downloaded: $lastError")
 }
 
 private fun isYouTubeUrl(url: String): Boolean = runCatching {
