@@ -321,6 +321,7 @@ fun DownloadMediaScreen(onBack: () -> Unit) {
                 if (info.durationSeconds > 0) {
                     Text("Length ${formatDuration(info.durationSeconds)}", color = SecondaryText, fontSize = 12.sp)
                 }
+                Text(info.summary, color = SecondaryText, fontSize = 10.sp)
             }
             Text("Available video qualities", color = PrimaryText, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
             Column(

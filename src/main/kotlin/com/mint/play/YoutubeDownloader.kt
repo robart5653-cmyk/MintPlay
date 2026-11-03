@@ -24,6 +24,7 @@ internal class VideoInfoData(
     val infoFile: File,
     val json: JSONObject,
     val clientIndex: Int,
+    val summary: String,
     val fetchedAt: Long = System.currentTimeMillis()
 )
 
@@ -124,7 +125,8 @@ internal object YoutubeDownloader {
                     heights = heights,
                     infoFile = infoFile,
                     json = json,
-                    clientIndex = index
+                    clientIndex = index,
+                    summary = formatSummary(json)
                 )
             } catch (e: Exception) {
                 lastError = e
@@ -203,15 +205,31 @@ internal object YoutubeDownloader {
         onStatus: (String) -> Unit,
         onProgress: (Float, String) -> Unit
     ): File {
-        onStatus("Downloading video stream…")
-        val video = downloadStream(info, workDir, "video", "bestvideo[height<=$height]") { percent, line ->
-            onProgress(percent, label("Video", line))
+        // The saved info makes this instant. But some YouTube formats don't survive being
+        // written to a file, and yt-dlp then reports "Requested format is not available".
+        // In that case fall back to reading the video again (slower, always works).
+        var useSavedInfo = true
+        fun fetchStream(prefix: String, format: String, name: String): File {
+            if (useSavedInfo) {
+                try {
+                    return downloadStream(info, workDir, prefix, format, true) { percent, line ->
+                        onProgress(percent, label(name, line))
+                    }
+                } catch (e: Exception) {
+                    useSavedInfo = false
+                    onStatus("Reading the video again with yt-dlp…")
+                }
+            }
+            return downloadStream(info, workDir, prefix, format, false) { percent, line ->
+                onProgress(percent, label(name, line))
+            }
         }
 
+        onStatus("Downloading video stream…")
+        val video = fetchStream("video", "bestvideo[height<=$height]", "Video")
+
         onStatus("Downloading audio stream…")
-        val audio = downloadStream(info, workDir, "audio", "bestaudio") { percent, line ->
-            onProgress(percent, label("Audio", line))
-        }
+        val audio = fetchStream("audio", "bestaudio", "Audio")
 
         onStatus("Merging video and audio with FFmpeg…")
         val output = File(workDir, safeFileName(info.title, info.json.text("id") ?: "video") + ".mkv")
@@ -223,15 +241,20 @@ internal object YoutubeDownloader {
         workDir: File,
         prefix: String,
         format: String,
+        fromSavedInfo: Boolean,
         onProgress: (Float, String) -> Unit
     ): File {
         // Clear leftovers so a half-finished file from an earlier attempt is never reused.
         workDir.listFiles()?.filter { it.name.startsWith("$prefix.") }?.forEach { it.delete() }
 
-        // No URL here: --load-info-json makes yt-dlp skip extraction and use the saved info.
-        val request = commonOptions(YoutubeDLRequest(emptyList<String>()))
-            .addOption("--load-info-json", info.infoFile.absolutePath)
-            .addOption("--newline")
+        val request = if (fromSavedInfo) {
+            // No URL: --load-info-json makes yt-dlp skip extraction and use the saved info.
+            commonOptions(YoutubeDLRequest(emptyList<String>()))
+                .addOption("--load-info-json", info.infoFile.absolutePath)
+        } else {
+            clientArgs(commonOptions(YoutubeDLRequest(info.url)), clientAttempts[info.clientIndex])
+        }
+        request.addOption("--newline")
             .addOption("-o", File(workDir, "$prefix.%(ext)s").absolutePath)
             .addOption("-f", format)
 
@@ -259,10 +282,13 @@ internal object YoutubeDownloader {
 
     // ---------------------------------------------------------------- segment download
 
+    /** The stream links FFmpeg will read. [audio] is null when the video already has sound. */
+    private class Streams(val video: JSONObject, val audio: JSONObject?, val root: JSONObject)
+
     /**
      * Downloads only [clip]. yt-dlp's own --download-sections needs a separate ffmpeg binary,
-     * so instead the direct stream URLs from the saved info go straight to FFmpegKit, which
-     * seeks to the start time and reads just that part of each stream.
+     * so instead the stream links go straight to FFmpegKit, which seeks to the start time and
+     * reads just that part of each stream (works for plain https streams and HLS playlists).
      */
     private fun downloadClip(
         info: VideoInfoData,
@@ -272,22 +298,62 @@ internal object YoutubeDownloader {
         onStatus: (String) -> Unit,
         onProgress: (Float, String) -> Unit
     ): File {
+        // Fast path: pick the streams from the info we already have.
         val video = pickVideoFormat(info.json, height)
-            ?: throw IllegalStateException("No directly downloadable video stream was found for ${height}p.")
         val audio = pickAudioFormat(info.json)
-            ?: throw IllegalStateException("No directly downloadable audio stream was found.")
+        if (video != null && audio != null) {
+            try {
+                return cutClip(info, Streams(video, audio, info.json), clip, workDir, onStatus, onProgress)
+            } catch (e: Exception) {
+                onStatus("Retrying with stream links resolved by yt-dlp…")
+            }
+        }
 
+        // Reliable path: ask yt-dlp for the exact streams it would download for this quality.
+        onStatus("Resolving the stream links with yt-dlp…")
+        return cutClip(info, resolveStreams(info, height), clip, workDir, onStatus, onProgress)
+    }
+
+    private fun resolveStreams(info: VideoInfoData, height: Int): Streams {
+        val request = clientArgs(commonOptions(YoutubeDLRequest(info.url)), clientAttempts[info.clientIndex])
+            .addOption("-f", "bestvideo[height<=$height]+bestaudio/best[height<=$height]")
+            .addOption("--dump-json")
+        val response = YoutubeDL.getInstance().execute(request, null, false, null)
+        val line = response.out.lineSequence().map { it.trim() }.firstOrNull { it.startsWith("{") }
+            ?: throw IllegalStateException("yt-dlp returned no stream information.")
+
+        val root = JSONObject(line)
+        val requested = root.optJSONArray("requested_formats")
+        val chosen = if (requested == null) emptyList<JSONObject>() else
+            (0 until requested.length()).mapNotNull { requested.optJSONObject(it) }
+        val video = chosen.firstOrNull { hasVideo(it) } ?: root
+        val audio = chosen.firstOrNull { hasAudio(it) && !hasVideo(it) }
+        if (video.text("url") == null) {
+            throw IllegalStateException("yt-dlp didn't return a stream link for ${height}p. " + formatSummary(root))
+        }
+        return Streams(video, audio, root)
+    }
+
+    private fun cutClip(
+        info: VideoInfoData,
+        streams: Streams,
+        clip: ClipRange,
+        workDir: File,
+        onStatus: (String) -> Unit,
+        onProgress: (Float, String) -> Unit
+    ): File {
         val length = clip.endSeconds - clip.startSeconds
         val name = safeFileName(info.title, info.json.text("id") ?: "video") +
             " (${stamp(clip.startSeconds)} to ${stamp(clip.endSeconds)}).mkv"
         val output = File(workDir, name)
+        output.delete()
 
         onStatus("Downloading ${clock(clip.startSeconds)} to ${clock(clip.endSeconds)} with FFmpeg…")
 
         val args = ArrayList<String>()
         args += listOf("-y", "-hide_banner", "-nostdin")
-        for (format in listOf(video, audio)) {
-            val headers = headerBlock(format, info.json)
+        for (format in listOfNotNull(streams.video, streams.audio)) {
+            val headers = headerBlock(format, streams.root)
             if (headers.isNotEmpty()) args += listOf("-headers", headers)
             args += listOf(
                 "-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5",
@@ -295,13 +361,13 @@ internal object YoutubeDownloader {
                 "-i", format.getString("url")
             )
         }
-        args += listOf(
-            "-t", length.toString(),
-            "-map", "0:v:0", "-map", "1:a:0",
-            "-c", "copy",
-            "-avoid_negative_ts", "make_zero",
-            output.absolutePath
-        )
+        args += listOf("-t", length.toString())
+        args += if (streams.audio != null) {
+            listOf("-map", "0:v:0", "-map", "1:a:0")
+        } else {
+            listOf("-map", "0:v:0", "-map", "0:a:0?")
+        }
+        args += listOf("-c", "copy", "-avoid_negative_ts", "make_zero", output.absolutePath)
 
         val totalMs = length * 1000.0
         val done = CountDownLatch(1)
@@ -327,10 +393,7 @@ internal object YoutubeDownloader {
     private fun pickVideoFormat(json: JSONObject, maxHeight: Int): JSONObject? =
         formatList(json)
             .filter { f ->
-                val v = f.text("vcodec")
-                val a = f.text("acodec")
-                v != null && v != "none" && (a == null || a == "none") &&
-                    f.optInt("height", 0) in 1..maxHeight && isDirect(f)
+                hasVideo(f) && !hasAudio(f) && f.optInt("height", 0) in 1..maxHeight && isReadable(f)
             }
             .sortedWith(
                 compareByDescending<JSONObject> { it.optInt("height", 0) }
@@ -341,11 +404,7 @@ internal object YoutubeDownloader {
             .firstOrNull()
 
     private fun pickAudioFormat(json: JSONObject): JSONObject? {
-        val candidates = formatList(json).filter { f ->
-            val v = f.text("vcodec")
-            val a = f.text("acodec")
-            (v == null || v == "none") && a != null && a != "none" && isDirect(f)
-        }
+        val candidates = formatList(json).filter { f -> hasAudio(f) && !hasVideo(f) && isReadable(f) }
         val withoutDrc = candidates.filterNot { (it.text("format_id") ?: "").contains("drc", ignoreCase = true) }
         return withoutDrc.ifEmpty { candidates }
             .sortedWith(
@@ -354,6 +413,12 @@ internal object YoutubeDownloader {
             )
             .firstOrNull()
     }
+
+    private fun hasVideo(format: JSONObject): Boolean =
+        format.text("vcodec").let { it != null && it != "none" }
+
+    private fun hasAudio(format: JSONObject): Boolean =
+        format.text("acodec").let { it != null && it != "none" }
 
     // H.264 first: it plays on every phone. Then VP9, then AV1.
     private fun codecRank(codec: String?): Int = when {
@@ -364,10 +429,11 @@ internal object YoutubeDownloader {
         else -> 3
     }
 
-    private fun isDirect(format: JSONObject): Boolean {
+    // Plain https streams and HLS playlists are both something FFmpeg can read.
+    private fun isReadable(format: JSONObject): Boolean {
         val url = format.text("url") ?: return false
         val protocol = format.text("protocol") ?: "https"
-        return url.startsWith("http") && (protocol == "https" || protocol == "http")
+        return url.startsWith("http") && protocol in setOf("https", "http", "m3u8_native", "m3u8")
     }
 
     private fun headerBlock(format: JSONObject, root: JSONObject): String {
@@ -389,6 +455,31 @@ internal object YoutubeDownloader {
             .map { it.trim().replace(Regex("https?://\\S+"), "<url>") }
             .filter { it.isNotEmpty() }
         return lines.takeLast(2).joinToString(" ").take(240).ifEmpty { "unknown error" }
+    }
+
+    // One short line describing what yt-dlp returned. Shown in the app to help debugging.
+    private fun formatSummary(json: JSONObject): String {
+        val all = formatList(json)
+        var videoOnly = 0
+        var audioOnly = 0
+        var muxed = 0
+        var noUrl = 0
+        val protocols = sortedMapOf<String, Int>()
+        for (format in all) {
+            val video = hasVideo(format)
+            val audio = hasAudio(format)
+            when {
+                video && audio -> muxed++
+                video -> videoOnly++
+                audio -> audioOnly++
+            }
+            if (format.text("url") == null) noUrl++
+            val protocol = format.text("protocol") ?: "?"
+            protocols[protocol] = (protocols[protocol] ?: 0) + 1
+        }
+        val kinds = protocols.entries.joinToString(", ") { "${it.key} ${it.value}" }
+        return "yt-dlp formats: ${all.size} (video-only $videoOnly, audio-only $audioOnly, " +
+            "with sound $muxed, no link $noUrl; $kinds)"
     }
 
     // ---------------------------------------------------------------- helpers

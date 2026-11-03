@@ -153,3 +153,23 @@ Not really, for ordinary YouTube downloads:
   `io.github.junkfood02.youtubedl-android:aria2c`. It can open several connections to one file,
   but YouTube sometimes answers many parallel connections with 403, and it adds another native
   library to the app.
+
+---
+
+## 8. Fallbacks (what happens when the saved info can't be used)
+
+YouTube's default clients change often, and some of their streams are HLS playlists or links
+that do not survive being saved to a file. The app handles this without you doing anything:
+
+- **Full download:** it first tries the saved info (instant). If yt-dlp answers
+  "Requested format is not available", it reads the video again with yt-dlp and downloads
+  normally. That is slower, but it always works.
+- **Segment download:** it first picks streams from the saved info. If FFmpeg cannot use them,
+  it asks yt-dlp (`-f "bestvideo[height<=N]+bestaudio" --dump-json`) for the exact stream links
+  it would download, and gives those to FFmpeg. FFmpeg can read both plain https streams and
+  HLS playlists, and with `-ss` it only fetches the part you asked for.
+- **Still failing:** the app retries once through another YouTube client.
+
+The small grey line under the video title ("yt-dlp formats: ...") shows how many video-only,
+audio-only and combined streams yt-dlp returned, and which protocols they use. It is there for
+debugging and can be removed from `DownloadMediaScreen.kt` once everything works.
