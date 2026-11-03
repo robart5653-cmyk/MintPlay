@@ -74,21 +74,6 @@ fun ToolsScreen() {
     val mainHandler = remember { Handler(Looper.getMainLooper()) }
 
     var selectedTool by remember { mutableStateOf<MediaTool?>(null) }
-    var showDownloadMedia by remember { mutableStateOf(false) }
-    val downloadPreferences = remember(context) {
-        context.getSharedPreferences("mintplay_download_settings", Context.MODE_PRIVATE)
-    }
-    var downloadVideoSegments by remember { mutableStateOf(false) }
-    var downloadLink by remember { mutableStateOf("") }
-    var downloadFolderUri by remember { mutableStateOf(downloadPreferences.getString("download_folder_uri", null)?.let { Uri.parse(it) }) }
-    var downloadFolderName by remember { mutableStateOf(downloadPreferences.getString("download_folder_name", null) ?: "No folder selected") }
-    var segmentStartTime by remember { mutableStateOf("00:00:00") }
-    var segmentEndTime by remember { mutableStateOf("00:00:00") }
-    var showSegmentTimeDialog by remember { mutableStateOf(false) }
-    var editingSegmentStart by remember { mutableStateOf(true) }
-    var selectedDownloadQuality by remember {
-        mutableStateOf(downloadPreferences.getString("download_quality", null))
-    }
     var sourceUri by remember { mutableStateOf<Uri?>(null) }
     var sourceName by remember { mutableStateOf<String?>(null) }
     var sourceIsAudio by remember { mutableStateOf(false) }
@@ -173,23 +158,6 @@ fun ToolsScreen() {
         }
     }
 
-    val downloadFolderLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocumentTree()
-    ) { uri ->
-        if (uri != null) {
-            val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or
-                Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-            runCatching { context.contentResolver.takePersistableUriPermission(uri, flags) }
-            val folderName = queryFolderName(context, uri)
-            downloadFolderUri = uri
-            downloadFolderName = folderName
-            downloadPreferences.edit()
-                .putString("download_folder_uri", uri.toString())
-                .putString("download_folder_name", folderName)
-                .apply()
-        }
-    }
-
     val inputLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri ->
@@ -253,16 +221,6 @@ fun ToolsScreen() {
         }
     }
 
-    if (showSegmentTimeDialog) {
-        SegmentTimeDialog(
-            initialTime = if (editingSegmentStart) segmentStartTime else segmentEndTime,
-            onDismiss = { showSegmentTimeDialog = false },
-            onConfirm = { time ->
-                if (editingSegmentStart) segmentStartTime = time else segmentEndTime = time
-                showSegmentTimeDialog = false
-            }
-        )
-    }
 
     Column(
         modifier = Modifier.fillMaxSize()
@@ -270,9 +228,7 @@ fun ToolsScreen() {
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        if (showDownloadMedia) {
-            DownloadMediaScreen(onBack = { showDownloadMedia = false })
-        } else if (selectedTool == null) {
+        if (selectedTool == null) {
             Text("Tools", color = PrimaryText, fontSize = 25.sp, fontWeight = FontWeight.Bold)
             Text("Simple ways to work with your media.", color = SecondaryText, fontSize = 14.sp)
             Spacer(Modifier.height(4.dp))
@@ -294,9 +250,6 @@ fun ToolsScreen() {
                 trimEndMs = 0L
                 statusMessage = null
                 errorMessage = null
-            }
-            ToolCard("DOWNLOAD_ICON", "Download Media", "Download video and audio from supported links.") {
-                showDownloadMedia = true
             }
         } else {
             Row(

@@ -209,11 +209,25 @@ internal object YoutubeDownloader {
         // written to a file, and yt-dlp then reports "Requested format is not available".
         // In that case fall back to reading the video again (slower, always works).
         var useSavedInfo = true
-        fun fetchStream(prefix: String, format: String, name: String): File {
+        val videoSize = estimatedFormatSize(pickVideoFormat(info.json, height))
+        val audioSize = estimatedFormatSize(pickAudioFormat(info.json))
+        val totalSize = if (videoSize > 0L && audioSize > 0L) videoSize + audioSize else 0L
+
+        fun reportProgress(name: String, streamSize: Long, offset: Long, percent: Float, line: String) {
+            if (totalSize > 0L && streamSize > 0L) {
+                val downloaded = offset + (streamSize * percent.coerceIn(0f, 100f) / 100f).toLong()
+                val overall = (downloaded.toDouble() / totalSize * 100.0).toFloat().coerceIn(0f, 100f)
+                onProgress(overall, "${String.format(Locale.ROOT, "%.1f", overall)}% of ${progressSizeLabel(totalSize)}; ${label(name, line)}")
+            } else {
+                onProgress(percent, label(name, line))
+            }
+        }
+
+        fun fetchStream(prefix: String, format: String, name: String, streamSize: Long, offset: Long): File {
             if (useSavedInfo) {
                 try {
                     return downloadStream(info, workDir, prefix, format, true) { percent, line ->
-                        onProgress(percent, label(name, line))
+                        reportProgress(name, streamSize, offset, percent, line)
                     }
                 } catch (e: Exception) {
                     useSavedInfo = false
@@ -221,15 +235,15 @@ internal object YoutubeDownloader {
                 }
             }
             return downloadStream(info, workDir, prefix, format, false) { percent, line ->
-                onProgress(percent, label(name, line))
+                reportProgress(name, streamSize, offset, percent, line)
             }
         }
 
         onStatus("Downloading video stream…")
-        val video = fetchStream("video", "bestvideo[height<=$height]", "Video")
+        val video = fetchStream("video", "bestvideo[height<=$height]", "Video", videoSize, 0L)
 
         onStatus("Downloading audio stream…")
-        val audio = fetchStream("audio", "bestaudio", "Audio")
+        val audio = fetchStream("audio", "bestaudio", "Audio", audioSize, videoSize)
 
         onStatus("Merging video and audio with FFmpeg…")
         val output = File(workDir, safeFileName(info.title, info.json.text("id") ?: "video") + ".mkv")
@@ -301,9 +315,16 @@ internal object YoutubeDownloader {
         // Fast path: pick the streams from the info we already have.
         val video = pickVideoFormat(info.json, height)
         val audio = pickAudioFormat(info.json)
+        val selectedVideo = video ?: pickVideoFormat(info.json, height)
+        val selectedAudio = audio ?: pickAudioFormat(info.json)
+        val fullSize = estimatedFormatSize(selectedVideo) + estimatedFormatSize(selectedAudio)
+        val clipSize = if (fullSize > 0L && info.durationSeconds > 0) {
+            (fullSize.toDouble() * (clip.endSeconds - clip.startSeconds) / info.durationSeconds).toLong()
+        } else 0L
+
         if (video != null && audio != null) {
             try {
-                return cutClip(info, Streams(video, audio, info.json), clip, workDir, onStatus, onProgress)
+                return cutClip(info, Streams(video, audio, info.json), clip, workDir, clipSize, onStatus, onProgress)
             } catch (e: Exception) {
                 onStatus("Retrying with stream links resolved by yt-dlp…")
             }
@@ -311,7 +332,7 @@ internal object YoutubeDownloader {
 
         // Reliable path: ask yt-dlp for the exact streams it would download for this quality.
         onStatus("Resolving the stream links with yt-dlp…")
-        return cutClip(info, resolveStreams(info, height), clip, workDir, onStatus, onProgress)
+        return cutClip(info, resolveStreams(info, height), clip, workDir, clipSize, onStatus, onProgress)
     }
 
     private fun resolveStreams(info: VideoInfoData, height: Int): Streams {
@@ -339,6 +360,7 @@ internal object YoutubeDownloader {
         streams: Streams,
         clip: ClipRange,
         workDir: File,
+        estimatedSizeBytes: Long,
         onStatus: (String) -> Unit,
         onProgress: (Float, String) -> Unit
     ): File {
@@ -377,7 +399,10 @@ internal object YoutubeDownloader {
             null,
             StatisticsCallback { statistics ->
                 val percent = (statistics.time.toDouble() / totalMs * 100.0).toFloat().coerceIn(0f, 100f)
-                onProgress(percent, "Segment: ${percent.toInt()}%")
+                val line = if (estimatedSizeBytes > 0L) {
+                    "${String.format(Locale.ROOT, "%.1f", percent)}% of ~${progressSizeLabel(estimatedSizeBytes)}; Segment"
+                } else "Segment: ${percent.toInt()}%"
+                onProgress(percent, line)
             }
         )
         done.await()
@@ -497,6 +522,21 @@ internal object YoutubeDownloader {
     private fun clientArgs(request: YoutubeDLRequest, client: String?): YoutubeDLRequest {
         if (client != null) request.addOption("--extractor-args", client)
         return request
+    }
+
+    private fun estimatedFormatSize(format: JSONObject?): Long {
+        if (format == null) return 0L
+        return format.optLong("filesize", 0L).takeIf { it > 0L }
+            ?: format.optLong("filesize_approx", 0L).takeIf { it > 0L }
+            ?: 0L
+    }
+
+    private fun progressSizeLabel(bytes: Long): String {
+        val units = listOf("B", "KiB", "MiB", "GiB", "TiB")
+        var value = bytes.toDouble()
+        var index = 0
+        while (value >= 1024.0 && index < units.lastIndex) { value /= 1024.0; index++ }
+        return String.format(Locale.ROOT, "%.1f%s", value, units[index])
     }
 
     private fun formatList(json: JSONObject): List<JSONObject> {
