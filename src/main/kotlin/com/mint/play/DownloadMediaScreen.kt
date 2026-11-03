@@ -25,9 +25,12 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -64,6 +67,10 @@ fun DownloadMediaScreen(onBack: () -> Unit) {
         mutableStateOf(preferences.getString("download_folder_name", null) ?: "No folder selected")
     }
     var qualities by remember { mutableStateOf<List<DownloadQuality>>(emptyList()) }
+    var videoInfo by remember { mutableStateOf<VideoInfoData?>(null) }
+    var clipEnabled by remember { mutableStateOf(false) }
+    var clipStart by remember { mutableStateOf("") }
+    var clipEnd by remember { mutableStateOf("") }
     var selectedHeight by remember { mutableStateOf<Int?>(null) }
     var checkingQualities by remember { mutableStateOf(false) }
     var downloading by remember { mutableStateOf(false) }
@@ -75,6 +82,13 @@ fun DownloadMediaScreen(onBack: () -> Unit) {
 
     DisposableEffect(Unit) {
         onDispose { screenActive = false }
+    }
+
+    // Start and update yt-dlp in the background while the user pastes a link.
+    LaunchedEffect(Unit) {
+        thread(name = "MintPlayPrepare") {
+            runCatching { YoutubeDownloader.prepare(context.applicationContext) }
+        }
     }
 
     val folderPicker = rememberLauncherForActivityResult(
@@ -101,25 +115,24 @@ fun DownloadMediaScreen(onBack: () -> Unit) {
 
         checkingQualities = true
         qualities = emptyList()
+        videoInfo = null
         selectedHeight = null
         status = "Checking available qualities with yt-dlp…"
         errorMessage = null
 
         thread(name = "MintPlayFormatCheck") {
             try {
-                val found = YoutubeDownloader.availableHeights(context.applicationContext, url) { message ->
+                val info = YoutubeDownloader.fetchInfo(context.applicationContext, url, { message ->
                     handler.post { if (screenActive) status = message }
-                }.map { DownloadQuality(it) }
+                })
+                val found = info.heights.map { DownloadQuality(it) }
                 handler.post {
                     if (screenActive) {
                         checkingQualities = false
+                        videoInfo = info
                         qualities = found
                         selectedHeight = found.firstOrNull()?.height
-                        status = if (found.isEmpty()) {
-                            "No selectable video qualities were found."
-                        } else {
-                            "Found ${found.size} available video quality levels."
-                        }
+                        status = "Found ${found.size} available video quality levels."
                         errorMessage = null
                     }
                 }
@@ -153,6 +166,27 @@ fun DownloadMediaScreen(onBack: () -> Unit) {
             return
         }
 
+        var clip: ClipRange? = null
+        if (clipEnabled) {
+            val start = parseTimestamp(clipStart)
+            val end = parseTimestamp(clipEnd)
+            val length = videoInfo?.durationSeconds ?: 0
+            if (start == null || end == null) {
+                errorMessage = "Enter the start and end times like 2:10:20."
+                return
+            }
+            if (end <= start) {
+                errorMessage = "The end time must be after the start time."
+                return
+            }
+            if (length > 0 && start >= length) {
+                errorMessage = "The start time is past the end of the video (${formatDuration(length)})."
+                return
+            }
+            clip = ClipRange(start, if (length > 0) minOf(end, length) else end)
+        }
+        val cachedInfo = videoInfo
+
         downloading = true
         progress = 0f
         progressLine = "Starting yt-dlp…"
@@ -173,6 +207,8 @@ fun DownloadMediaScreen(onBack: () -> Unit) {
                     url = url,
                     height = height,
                     workDir = taskDir,
+                    cachedInfo = cachedInfo,
+                    clip = clip,
                     onStatus = { message ->
                         handler.post { if (screenActive) progressLine = message }
                     },
@@ -238,6 +274,7 @@ fun DownloadMediaScreen(onBack: () -> Unit) {
             onValueChange = {
                 link = it
                 qualities = emptyList()
+                videoInfo = null
                 selectedHeight = null
                 status = null
                 errorMessage = null
@@ -279,6 +316,12 @@ fun DownloadMediaScreen(onBack: () -> Unit) {
         }
 
         if (qualities.isNotEmpty()) {
+            videoInfo?.let { info ->
+                Text(info.title, color = PrimaryText, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 2)
+                if (info.durationSeconds > 0) {
+                    Text("Length ${formatDuration(info.durationSeconds)}", color = SecondaryText, fontSize = 12.sp)
+                }
+            }
             Text("Available video qualities", color = PrimaryText, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
             Column(
                 modifier = Modifier.fillMaxWidth()
@@ -312,6 +355,46 @@ fun DownloadMediaScreen(onBack: () -> Unit) {
             }
         }
 
+        if (qualities.isNotEmpty()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Switch(
+                    checked = clipEnabled,
+                    onCheckedChange = { clipEnabled = it },
+                    enabled = !downloading,
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Background,
+                        checkedTrackColor = Accent,
+                        uncheckedThumbColor = SecondaryText,
+                        uncheckedTrackColor = NavBackground,
+                        uncheckedBorderColor = SecondaryText
+                    )
+                )
+                Column {
+                    Text("Download only a segment", color = PrimaryText, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                    Text(
+                        "Only the chosen part is downloaded. Cuts snap to the nearest keyframe.",
+                        color = SecondaryText,
+                        fontSize = 11.sp
+                    )
+                }
+            }
+            if (clipEnabled) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    TimeField("Start (0:00:00)", clipStart, !downloading, Modifier.weight(1f)) { clipStart = it }
+                    TimeField("End (0:10:00)", clipEnd, !downloading, Modifier.weight(1f)) { clipEnd = it }
+                }
+                Text(
+                    "Use H:MM:SS, MM:SS or plain seconds, for example 2:10:20.",
+                    color = SecondaryText,
+                    fontSize = 11.sp
+                )
+            }
+        }
+
         Column(
             modifier = Modifier.fillMaxWidth()
                 .clip(RoundedCornerShape(16.dp))
@@ -328,7 +411,7 @@ fun DownloadMediaScreen(onBack: () -> Unit) {
         }
 
         Text(
-            "Video and audio are downloaded as separate streams and merged into an MKV file.",
+            "Video and audio are downloaded as separate streams and merged into an MKV file named after the video title.",
             color = SecondaryText,
             fontSize = 12.sp
         )
@@ -344,7 +427,10 @@ fun DownloadMediaScreen(onBack: () -> Unit) {
                 disabledContentColor = SecondaryText
             )
         ) {
-            Text(if (downloading) "Downloading…" else "Download selected quality", fontWeight = FontWeight.Bold)
+            Text(
+                if (downloading) "Downloading…" else if (clipEnabled) "Download segment" else "Download selected quality",
+                fontWeight = FontWeight.Bold
+            )
         }
 
         if (downloading) {
@@ -409,3 +495,46 @@ private fun saveFileToTree(context: Context, treeUri: Uri, source: File) {
         source.inputStream().use { input -> input.copyTo(output) }
     } ?: error("Couldn't open the destination file.")
 }
+
+@Composable
+private fun TimeField(
+    label: String,
+    value: String,
+    enabled: Boolean,
+    modifier: Modifier,
+    onChange: (String) -> Unit
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onChange,
+        modifier = modifier,
+        enabled = enabled,
+        singleLine = true,
+        textStyle = TextStyle(color = PrimaryText, fontSize = 15.sp),
+        shape = RoundedCornerShape(8.dp),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = Accent,
+            unfocusedBorderColor = Accent,
+            cursorColor = Accent,
+            focusedTextColor = PrimaryText,
+            unfocusedTextColor = PrimaryText
+        ),
+        placeholder = { Text(label) }
+    )
+}
+
+// Accepts H:MM:SS, MM:SS or plain seconds. Returns null for anything else.
+private fun parseTimestamp(text: String): Int? {
+    val parts = text.trim().split(":")
+    if (parts.isEmpty() || parts.size > 3) return null
+    var total = 0L
+    for (part in parts) {
+        val value = part.trim().toLongOrNull() ?: return null
+        if (value < 0) return null
+        total = total * 60 + value
+    }
+    return if (total <= 48L * 3600) total.toInt() else null
+}
+
+private fun formatDuration(seconds: Int): String =
+    String.format(Locale.ROOT, "%d:%02d:%02d", seconds / 3600, seconds / 60 % 60, seconds % 60)
