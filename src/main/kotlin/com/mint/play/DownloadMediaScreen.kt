@@ -40,13 +40,6 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.arthenica.ffmpegkit.FFmpegKit
-import com.arthenica.ffmpegkit.ReturnCode
-import com.chaquo.python.PyObject
-import com.chaquo.python.Python
-import dev.ffmpegkit_maintained.ytdlp.DownloadProgressCallback
-import dev.ffmpegkit_maintained.ytdlp.YtDlp
-import dev.ffmpegkit_maintained.ytdlp.YtDlpRequest
 import java.io.File
 import java.util.Locale
 import kotlin.concurrent.thread
@@ -114,8 +107,9 @@ fun DownloadMediaScreen(onBack: () -> Unit) {
 
         thread(name = "MintPlayFormatCheck") {
             try {
-                YtDlp.init(context.applicationContext)
-                val found = inspectAvailableHeights(url)
+                val found = YoutubeDownloader.availableHeights(context.applicationContext, url) { message ->
+                    handler.post { if (screenActive) status = message }
+                }.map { DownloadQuality(it) }
                 handler.post {
                     if (screenActive) {
                         checkingQualities = false
@@ -130,7 +124,7 @@ fun DownloadMediaScreen(onBack: () -> Unit) {
                     }
                 }
             } catch (exception: Exception) {
-                val reason = exception.cause?.message ?: exception.message ?: "Unknown format inspection error"
+                val reason = YoutubeDownloader.describe(exception)
                 handler.post {
                     if (screenActive) {
                         checkingQualities = false
@@ -168,55 +162,29 @@ fun DownloadMediaScreen(onBack: () -> Unit) {
         thread(name = "MintPlayDownload") {
             var taskDirectory: File? = null
             try {
-                YtDlp.init(context.applicationContext)
                 val root = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
                     ?: context.cacheDir
                 val taskDir = File(root, "mintplay_${System.currentTimeMillis()}")
                 taskDirectory = taskDir
                 check(taskDir.mkdirs()) { "Couldn't create the temporary download folder." }
 
-                fun progressCallback(label: String) = DownloadProgressCallback { value, eta, line ->
-                    handler.post {
-                        if (screenActive) {
-                            progress = value.coerceIn(0f, 100f)
-                            progressLine = if (line.isNotBlank()) "$label: $line"
-                            else if (eta > 0L) "$label: about $eta seconds remaining"
-                            else "$label…"
+                val output = YoutubeDownloader.download(
+                    context = context.applicationContext,
+                    url = url,
+                    height = height,
+                    workDir = taskDir,
+                    onStatus = { message ->
+                        handler.post { if (screenActive) progressLine = message }
+                    },
+                    onProgress = { percent, line ->
+                        handler.post {
+                            if (screenActive) {
+                                progress = percent.coerceIn(0f, 100f)
+                                progressLine = line
+                            }
                         }
                     }
-                }
-
-                // Every quality downloads separate video and audio streams, then merges them.
-                // yt-dlp's own default YouTube clients are tried first; if YouTube rejects the
-                // stream (HTTP 403), downloadStream() retries with a fallback client.
-                handler.post { if (screenActive) progressLine = "Downloading video stream…" }
-                val videoFile = downloadStream(
-                    url = url,
-                    taskDir = taskDir,
-                    prefix = "video",
-                    format = "bestvideo[height<=${height}]",
-                    progress = progressCallback("Video")
                 )
-
-                handler.post { if (screenActive) progressLine = "Downloading audio stream…" }
-                val audioFile = downloadStream(
-                    url = url,
-                    taskDir = taskDir,
-                    prefix = "audio",
-                    format = "bestaudio",
-                    progress = progressCallback("Audio")
-                )
-
-                val merged = File(taskDir, "MintPlay_${System.currentTimeMillis()}.mkv")
-                handler.post { if (screenActive) progressLine = "Merging video and audio with FFmpeg…" }
-
-                fun quote(file: File): String = "'" + file.absolutePath.replace("'", "'\\''") + "'"
-                val command = "-y -i ${quote(videoFile)} -i ${quote(audioFile)} -map 0:v:0 -map 1:a:0 -c copy ${quote(merged)}"
-                val session = FFmpegKit.execute(command)
-                check(ReturnCode.isSuccess(session.returnCode)) {
-                    "FFmpeg couldn't merge the selected streams. Return code: ${session.returnCode}."
-                }
-                val output = merged
 
                 saveFileToTree(context, destinationTree, output)
                 taskDir.deleteRecursively()
@@ -232,7 +200,7 @@ fun DownloadMediaScreen(onBack: () -> Unit) {
                 }
             } catch (exception: Exception) {
                 taskDirectory?.deleteRecursively()
-                val reason = exception.cause?.message ?: exception.message ?: "Unknown download error"
+                val reason = YoutubeDownloader.describe(exception)
                 handler.post {
                     if (screenActive) {
                         downloading = false
@@ -395,81 +363,6 @@ fun DownloadMediaScreen(onBack: () -> Unit) {
         status?.let { Text(it, color = Accent, fontSize = 13.sp) }
         errorMessage?.let { Text(it, color = androidx.compose.ui.graphics.Color(0xFFFF7777), fontSize = 13.sp) }
     }
-}
-
-private fun inspectAvailableHeights(url: String): List<DownloadQuality> {
-    val python = Python.getInstance()
-    val options = python.getBuiltins().callAttr("dict")
-    val optionMap = options.asMap()
-    optionMap[PyObject.fromJava("quiet")] = PyObject.fromJava(true)
-    optionMap[PyObject.fromJava("no_warnings")] = PyObject.fromJava(true)
-    optionMap[PyObject.fromJava("noplaylist")] = PyObject.fromJava(true)
-    optionMap[PyObject.fromJava("skip_download")] = PyObject.fromJava(true)
-
-    // No forced player client: let yt-dlp pick its current default YouTube clients.
-
-    val downloader = python.getModule("yt_dlp").callAttr("YoutubeDL", options)
-    val info = downloader.callAttr("extract_info", url, false)
-    val formats = info.callAttr("get", "formats") ?: return emptyList()
-    val heights = linkedSetOf<Int>()
-
-    for (format in formats.asList()) {
-        val height = format.callAttr("get", "height")?.toInt() ?: continue
-        if (height in 144..4320) heights.add(height)
-    }
-
-    return heights.sortedDescending().map { DownloadQuality(it) }
-}
-
-
-// Tried in order. The yt-dlp bundled in the library can be older than the release that
-// removed YouTube's broken default client, so android_vr (no PO token needed) goes first.
-// null = let yt-dlp choose its own default YouTube clients.
-private val clientAttempts: List<String?> = listOf(
-    "youtube:player_client=android_vr",
-    null
-)
-
-private fun downloadStream(
-    url: String,
-    taskDir: File,
-    prefix: String,
-    format: String,
-    progress: DownloadProgressCallback
-): File {
-    var lastError = "unknown error"
-    for (client in clientAttempts) {
-        // Clear leftovers from a previous attempt so a half-finished file is never reused.
-        taskDir.listFiles()?.filter { it.name.startsWith("$prefix.") }?.forEach { it.delete() }
-
-        val request = YtDlpRequest(url)
-            .setOutputTemplate(File(taskDir, "$prefix.%(ext)s").absolutePath)
-            .addOption("--no-playlist")
-            .addOption("--newline")
-            .addOption("--retries", "10")
-            .addOption("--fragment-retries", "10")
-            .addOption("-f", format)
-        if (client != null) request.addOption("--extractor-args", client)
-
-        // The library may throw on a failed download instead of returning a failed
-        // response, so catch it here and fall through to the next client.
-        try {
-            val response = YtDlp.executeAsync(request, progress).get()
-            if (response.isSuccess()) {
-                val file = taskDir.listFiles()?.firstOrNull {
-                    it.isFile && it.name.startsWith("$prefix.") &&
-                        !it.name.endsWith(".part") && !it.name.endsWith(".ytdl")
-                }
-                if (file != null) return file
-                lastError = "yt-dlp finished but no $prefix file was created"
-            } else {
-                lastError = "yt-dlp exit code ${response.exitCode}"
-            }
-        } catch (exception: Exception) {
-            lastError = exception.cause?.message ?: exception.message ?: "unknown yt-dlp error"
-        }
-    }
-    error("The $prefix stream couldn't be downloaded: $lastError")
 }
 
 private fun isYouTubeUrl(url: String): Boolean = runCatching {
