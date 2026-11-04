@@ -2,14 +2,11 @@ package com.mint.play
 
 import android.content.res.Configuration
 import android.os.Bundle
-import androidx.compose.foundation.layout.padding
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.core.view.WindowCompat
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -28,9 +25,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
@@ -85,7 +79,6 @@ fun MyScreen(
     var selectedTab by remember { mutableIntStateOf(0) }
     var playerOpen by remember { mutableStateOf(false) }
     var showAudioPlayer by remember { mutableStateOf(false) }
-    var showDownloads by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val audioPlayerController = remember(context) { AudioPlayerController(context) }
     val configuration = LocalConfiguration.current
@@ -117,13 +110,10 @@ fun MyScreen(
                 else Modifier.windowInsetsPadding(WindowInsets.safeDrawing)
             )
     ) {
-        if (showDownloads) {
-            DownloadsTab(onBack = { showDownloads = false })
-        } else {
-            val audioPlayerVisible = showAudioPlayer && selectedTab == 1
+        val audioPlayerVisible = showAudioPlayer && selectedTab == 1
 
             if (!playerOpen && !audioPlayerVisible) {
-                TopBar(onDownloadsClick = { showDownloads = true })
+                TopBar()
             }
 
             Column(
@@ -169,12 +159,11 @@ fun MyScreen(
             )
         }
 
-            if (!playerOpen && !audioPlayerVisible) {
-                BottomNavigation(
-                    selectedTab = selectedTab,
-                    onTabSelected = { selectedTab = it }
-                )
-            }
+        if (!playerOpen && !audioPlayerVisible) {
+            BottomNavigation(
+                selectedTab = selectedTab,
+                onTabSelected = { selectedTab = it }
+            )
         }
     }
 }
@@ -184,33 +173,5 @@ fun MyScreen(
 fun MyScreenPreview() {
     MaterialTheme {
         MyScreen()
-    }
-}
-
-
-@Composable
-private fun DownloadsTab(onBack: () -> Unit) {
-    Column(modifier = Modifier.fillMaxSize()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onBack)
-                .padding(horizontal = 18.dp, vertical = 10.dp),
-            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
-        ) {
-            androidx.compose.material3.Text(
-                "‹",
-                color = Accent,
-                fontSize = 30.sp,
-                fontWeight = FontWeight.Normal
-            )
-            androidx.compose.material3.Text(
-                " Downloading",
-                color = PrimaryText,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold
-            )
-        }
-        DownloadMonitorCard()
     }
 }
